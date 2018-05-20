@@ -265,7 +265,7 @@ namespace Ryujinx.Core.OsHle.Kernel
 
             Process.PrintStackTrace(ThreadState);
 
-            throw new GuestBrokeExecutionException();
+            //throw new GuestBrokeExecutionException();
         }
 
         private void SvcOutputDebugString(AThreadState ThreadState)
@@ -354,7 +354,7 @@ namespace Ryujinx.Core.OsHle.Kernel
                 default:
                     Process.PrintStackTrace(ThreadState);
 
-                    throw new NotImplementedException($"SvcGetInfo: {InfoType} {Handle:x8} {InfoId}");
+                    //throw new NotImplementedException($"SvcGetInfo: {InfoType} {Handle:x8} {InfoId}");
             }
 
             ThreadState.X0 = 0;
