@@ -232,12 +232,12 @@ namespace Ryujinx.Core.OsHle
 
         private void BreakHandler(object sender, AInstExceptionEventArgs e)
         {
-            throw new GuestBrokeExecutionException();
+            //throw new GuestBrokeExecutionException();
         }
 
         private void UndefinedHandler(object sender, AInstUndefinedEventArgs e)
         {
-            throw new UndefinedInstructionException(e.Position, e.RawOpCode);
+            //throw new UndefinedInstructionException(e.Position, e.RawOpCode);
         }
 
         private void MakeSymbolTable()
@@ -378,7 +378,7 @@ namespace Ryujinx.Core.OsHle
         {
             if (!Threads.TryGetValue(Tpidr, out KThread Thread))
             {
-                throw new InvalidOperationException();
+                //throw new InvalidOperationException();
             }
 
             return Thread;
