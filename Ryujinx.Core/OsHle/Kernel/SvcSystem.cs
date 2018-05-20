@@ -351,10 +351,10 @@ namespace Ryujinx.Core.OsHle.Kernel
                     ThreadState.X1 = MemoryRegions.MapRegionSize;
                     break;
 
-                default:
-                    Process.PrintStackTrace(ThreadState);
+                //default:
+                    //Process.PrintStackTrace(ThreadState);
 
-                    throw new NotImplementedException($"SvcGetInfo: {InfoType} {Handle:x8} {InfoId}");
+                    //throw new NotImplementedException($"SvcGetInfo: {InfoType} {Handle:x8} {InfoId}");
             }
 
             ThreadState.X0 = 0;
