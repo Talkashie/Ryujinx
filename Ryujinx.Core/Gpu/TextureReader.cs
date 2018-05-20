@@ -20,7 +20,7 @@ namespace Ryujinx.Core.Gpu
                 case GalTextureFormat.BC5:      return Read16Bpt4x4(Memory, Texture);
             }
 
-            throw new NotImplementedException(Texture.Format.ToString());
+            return Read16Bpt4x4(Memory, Texture);
         }
 
         private unsafe static byte[] Read2Bpp(IAMemory Memory, Texture Texture)
