@@ -71,7 +71,7 @@ namespace Ryujinx.Core.OsHle.Services
                 }
                 else
                 {
-                    throw new NotImplementedException($"Domain command: {DomainCmd}");
+                    //throw new NotImplementedException($"Domain command: {DomainCmd}");
                 }
             }
 
@@ -107,7 +107,7 @@ namespace Ryujinx.Core.OsHle.Services
             {
                 string DbgMessage = $"{Context.Session.ServiceName} {Service.GetType().Name}: {CommandId}";
 
-                throw new NotImplementedException(DbgMessage);
+                //throw new NotImplementedException(DbgMessage);
             }
         }
 
