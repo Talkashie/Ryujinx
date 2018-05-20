@@ -104,7 +104,7 @@ namespace Ryujinx.Core.OsHle.Kernel
             {
                 Process.PrintStackTrace(ThreadState);
 
-                throw new NotImplementedException(e.Id.ToString("x4"));
+                //throw new NotImplementedException(e.Id.ToString("x4"));
             }
         }
 
