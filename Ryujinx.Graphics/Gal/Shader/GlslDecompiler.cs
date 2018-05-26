@@ -430,7 +430,6 @@ namespace Ryujinx.Graphics.Gal.Shader
 
                     return Expr;
 
-                default: return GetName (Pred);
             }
         }
 
