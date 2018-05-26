@@ -430,7 +430,7 @@ namespace Ryujinx.Graphics.Gal.Shader
 
                     return Expr;
 
-                default: {}//throw new ArgumentException(nameof(Node));
+                default: return GetName (Pred);
             }
         }
 
