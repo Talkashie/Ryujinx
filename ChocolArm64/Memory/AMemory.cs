@@ -602,7 +602,7 @@ namespace ChocolArm64.Memory
         {
             if (!Manager.IsMapped(Position))
             {
-                throw new VmmPageFaultException(Position);
+                //throw new VmmPageFaultException(Position);
             }
 
             if (!Manager.HasPermission(Position, Perm))
