@@ -607,7 +607,7 @@ namespace ChocolArm64.Memory
 
             if (!Manager.HasPermission(Position, Perm))
             {
-                throw new VmmAccessViolationException(Position, Perm);
+                //throw new VmmAccessViolationException(Position, Perm);
             }
         }
 
