@@ -17,7 +17,6 @@ namespace Ryujinx.Core.OsHle.Services.Am
                 { 1,  PopLaunchParameter          },
                 { 20, EnsureSaveData              },
                 { 21, GetDesiredLanguage          },
-                { 22, SetTerminateResult          },
                 { 23, GetDisplayVersion           },
                 { 40, NotifyRunning               },
                 { 50, GetPseudoDeviceId           },
@@ -53,17 +52,6 @@ namespace Ryujinx.Core.OsHle.Services.Am
             return 0;
         }
 
-        public long SetTerminateResult(ServiceCtx Context)
-        {
-            int ErrorCode = Context.RequestData.ReadInt32();
-
-            string Result = GetFormattedErrorCode(ErrorCode);
-
-            Context.Ns.Log.PrintInfo(LogClass.ServiceAm, $"Result = 0x{ErrorCode:x8} ({Result}).");
-
-            return 0;
-        }
-
         private string GetFormattedErrorCode(int ErrorCode)
         {
             int Module      = (ErrorCode >> 0) & 0x1ff;
@@ -91,7 +79,7 @@ namespace Ryujinx.Core.OsHle.Services.Am
         public long GetPseudoDeviceId(ServiceCtx Context)
         {
             Context.Ns.Log.PrintStub(LogClass.ServiceAm, "Stubbed.");
-            
+
             Context.ResponseData.Write(0L);
             Context.ResponseData.Write(0L);
 
