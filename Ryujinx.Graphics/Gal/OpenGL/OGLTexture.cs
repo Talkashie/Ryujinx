@@ -1,4 +1,6 @@
 using OpenTK.Graphics.OpenGL;
+using Ryujinx.Graphics.Gal.Texture;
+using System;
 
 namespace Ryujinx.Graphics.Gal.OpenGL
 {
@@ -36,6 +38,11 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             }
             else
             {
+                if (Texture.Format >= GalTextureFormat.Astc2D4x4)
+                {
+                    Texture = ConvertAstcTextureToRgba(Texture);
+                }
+
                 const PixelInternalFormat InternalFmt = PixelInternalFormat.Rgba;
 
                 (PixelFormat Format, PixelType Type) = OGLEnumConverter.GetTextureFormat(Texture.Format);
@@ -61,6 +68,69 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureSwizzleG, SwizzleG);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureSwizzleB, SwizzleB);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureSwizzleA, SwizzleA);
+        }
+
+        private static GalTexture ConvertAstcTextureToRgba(GalTexture Texture)
+        {
+            int TextureBlockWidth  = GetAstcBlockWidth(Texture.Format);
+            int TextureBlockHeight = GetAstcBlockHeight(Texture.Format);
+
+            Texture.Data = ASTCDecoder.DecodeToRGBA8888(
+                Texture.Data,
+                TextureBlockWidth,
+                TextureBlockHeight, 1,
+                Texture.Width,
+                Texture.Height, 1);
+
+            Texture.Format = GalTextureFormat.A8B8G8R8;
+
+            return Texture;
+        }
+
+        private static int GetAstcBlockWidth(GalTextureFormat Format)
+        {
+            switch (Format)
+            {
+                case GalTextureFormat.Astc2D4x4:   return 4;
+                case GalTextureFormat.Astc2D5x5:   return 5;
+                case GalTextureFormat.Astc2D6x6:   return 6;
+                case GalTextureFormat.Astc2D8x8:   return 8;
+                case GalTextureFormat.Astc2D10x10: return 10;
+                case GalTextureFormat.Astc2D12x12: return 12;
+                case GalTextureFormat.Astc2D5x4:   return 5;
+                case GalTextureFormat.Astc2D6x5:   return 6;
+                case GalTextureFormat.Astc2D8x6:   return 8;
+                case GalTextureFormat.Astc2D10x8:  return 10;
+                case GalTextureFormat.Astc2D12x10: return 12;
+                case GalTextureFormat.Astc2D8x5:   return 8;
+                case GalTextureFormat.Astc2D10x5:  return 10;
+                case GalTextureFormat.Astc2D10x6:  return 10;
+            }
+
+            throw new ArgumentException(nameof(Format));
+        }
+
+        private static int GetAstcBlockHeight(GalTextureFormat Format)
+        {
+            switch (Format)
+            {
+                case GalTextureFormat.Astc2D4x4:   return 4;
+                case GalTextureFormat.Astc2D5x5:   return 5;
+                case GalTextureFormat.Astc2D6x6:   return 6;
+                case GalTextureFormat.Astc2D8x8:   return 8;
+                case GalTextureFormat.Astc2D10x10: return 10;
+                case GalTextureFormat.Astc2D12x12: return 12;
+                case GalTextureFormat.Astc2D5x4:   return 4;
+                case GalTextureFormat.Astc2D6x5:   return 5;
+                case GalTextureFormat.Astc2D8x6:   return 6;
+                case GalTextureFormat.Astc2D10x8:  return 8;
+                case GalTextureFormat.Astc2D12x10: return 10;
+                case GalTextureFormat.Astc2D8x5:   return 5;
+                case GalTextureFormat.Astc2D10x5:  return 5;
+                case GalTextureFormat.Astc2D10x6:  return 6;
+            }
+
+            throw new ArgumentException(nameof(Format));
         }
 
         public void Bind(int Index)
