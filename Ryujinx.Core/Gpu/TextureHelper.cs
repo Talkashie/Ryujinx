@@ -18,7 +18,7 @@ namespace Ryujinx.Core.Gpu
                     return new BlockLinearSwizzle(Width, Bpp, Texture.BlockHeight);
             }
 
-            throw new NotImplementedException(Texture.Swizzle.ToString());
+            //throw new NotImplementedException(Texture.Swizzle.ToString());
         }
 
         public static (AMemory Memory, long Position) GetMemoryAndPosition(
