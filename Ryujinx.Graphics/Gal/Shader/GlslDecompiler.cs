@@ -974,7 +974,8 @@ namespace Ryujinx.Graphics.Gal.Shader
             switch (Node)
             {
                 case ShaderIrOperAbuf Abuf:
-                    return Abuf.Offs == GlslDecl.VertexIdAttr
+                    return Abuf.Offs == GlslDecl.VertexIdAttr ||
+                           Abuf.Offs == GlslDecl.InstanceIdAttr
                         ? OperType.I32
                         : OperType.F32;
 

@@ -54,7 +54,14 @@ namespace ChocolArm64.Memory
 
             ExAddrs = new HashSet<long>();
 
-            Ram = Marshal.AllocHGlobal((IntPtr)AMemoryMgr.RamSize + AMemoryMgr.PageSize);
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                Ram = AMemoryWin32.Allocate((IntPtr)AMemoryMgr.RamSize + AMemoryMgr.PageSize);
+            }
+            else
+            {
+                Ram = Marshal.AllocHGlobal((IntPtr)AMemoryMgr.RamSize + AMemoryMgr.PageSize);
+            }
 
             RamPtr = (byte*)Ram;
         }
@@ -139,6 +146,51 @@ namespace ChocolArm64.Memory
             {
                 ExAddrs.Remove(Position);
             }
+        }
+
+        public long GetHostPageSize()
+        {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                return AMemoryMgr.PageSize;
+            }
+
+            IntPtr MemAddress = new IntPtr(RamPtr);
+            IntPtr MemSize    = new IntPtr(AMemoryMgr.RamSize);
+
+            long PageSize = AMemoryWin32.IsRegionModified(MemAddress, MemSize, Reset: false);
+
+            if (PageSize < 1)
+            {
+                throw new InvalidOperationException();
+            }
+
+            return PageSize;
+        }
+
+        public bool IsRegionModified(long Position, long Size)
+        {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                return true;
+            }
+
+            long EndPos = Position + Size;
+
+            if ((ulong)EndPos < (ulong)Position)
+            {
+                return false;
+            }
+
+            if ((ulong)EndPos > AMemoryMgr.RamSize)
+            {
+                return false;
+            }
+
+            IntPtr MemAddress = new IntPtr(RamPtr + Position);
+            IntPtr MemSize    = new IntPtr(Size);
+
+            return AMemoryWin32.IsRegionModified(MemAddress, MemSize, Reset: true) != 0;
         }
 
         public sbyte ReadSByte(long Position)
@@ -326,7 +378,7 @@ namespace ChocolArm64.Memory
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public Vector128<float> ReadVector32Unchecked(long Position)
         {
             if (Sse.IsSupported)
@@ -339,7 +391,7 @@ namespace ChocolArm64.Memory
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public Vector128<float> ReadVector64Unchecked(long Position)
         {
             if (Sse2.IsSupported)
@@ -363,6 +415,22 @@ namespace ChocolArm64.Memory
             {
                 throw new PlatformNotSupportedException();
             }
+        }
+
+        public byte[] ReadBytes(long Position, long Size)
+        {
+            if ((uint)Size > int.MaxValue)
+            {
+                throw new ArgumentOutOfRangeException(nameof(Size));
+            }
+
+            EnsureRangeIsValid(Position, Size, AMemoryPerm.Read);
+
+            byte[] Data = new byte[Size];
+
+            Marshal.Copy((IntPtr)(RamPtr + (uint)Position), Data, 0, (int)Size);
+
+            return Data;
         }
 
         public void WriteSByte(long Position, sbyte Value)
@@ -559,7 +627,7 @@ namespace ChocolArm64.Memory
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public void WriteVector32Unchecked(long Position, Vector128<float> Value)
         {
             if (Sse.IsSupported)
@@ -572,7 +640,7 @@ namespace ChocolArm64.Memory
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public void WriteVector64Unchecked(long Position, Vector128<float> Value)
         {
             if (Sse2.IsSupported)
@@ -598,6 +666,27 @@ namespace ChocolArm64.Memory
             }
         }
 
+        public void WriteBytes(long Position, byte[] Data)
+        {
+            EnsureRangeIsValid(Position, (uint)Data.Length, AMemoryPerm.Write);
+
+            Marshal.Copy(Data, 0, (IntPtr)(RamPtr + (uint)Position), Data.Length);
+        }
+
+        private void EnsureRangeIsValid(long Position, long Size, AMemoryPerm Perm)
+        {
+            long EndPos = Position + Size;
+
+            Position &= ~AMemoryMgr.PageMask;
+
+            while ((ulong)Position < (ulong)EndPos)
+            {
+                EnsureAccessIsValid(Position, Perm);
+
+                Position += AMemoryMgr.PageSize;
+            }
+        }
+
         private void EnsureAccessIsValid(long Position, AMemoryPerm Perm)
         {
             if (!Manager.IsMapped(Position))
@@ -620,7 +709,14 @@ namespace ChocolArm64.Memory
         {
             if (Ram != IntPtr.Zero)
             {
-                Marshal.FreeHGlobal(Ram);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    AMemoryWin32.Free(Ram);
+                }
+                else
+                {
+                    Marshal.FreeHGlobal(Ram);
+                }
 
                 Ram = IntPtr.Zero;
             }
