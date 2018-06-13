@@ -19,7 +19,7 @@ namespace Ryujinx.HLE.Gpu
                     return new BlockLinearSwizzle(Width, Bpp, Texture.BlockHeight);
             }
 
-            throw new NotImplementedException(Texture.Swizzle.ToString());
+            return new LinearSwizzle(Texture.Pitch, Bpp);
         }
 
         public static int GetTextureSize(GalTexture Texture)
