@@ -14,7 +14,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalIndexFormat.Int32: return DrawElementsType.UnsignedInt;
             }
 
-            throw new ArgumentException(nameof(Format));
+            return DrawElementsType.UnsignedByte;
         }
 
         public static PrimitiveType GetPrimitiveType(GalPrimitiveType Type)
@@ -38,7 +38,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalPrimitiveType.Patches:                return PrimitiveType.Patches;
             }
 
-            throw new ArgumentException(nameof(Type));
+            return PrimitiveType.Points;
         }
 
         public static ShaderType GetShaderType(GalShaderType Type)
@@ -52,7 +52,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalShaderType.Fragment:       return ShaderType.FragmentShader;
             }
 
-            throw new ArgumentException(nameof(Type));
+            return ShaderType.VertexShader;
         }
 
         public static (PixelFormat, PixelType) GetTextureFormat(GalTextureFormat Format)
@@ -70,7 +70,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalTextureFormat.R8:           return (PixelFormat.Red,  PixelType.UnsignedByte);
             }
 
-            throw new NotImplementedException(Format.ToString());
+            return (PixelFormat.Rgba, PixelType.Float);
         }
 
         public static PixelInternalFormat GetCompressedTextureFormat(GalTextureFormat Format)
@@ -85,7 +85,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalTextureFormat.BC5:  return PixelInternalFormat.CompressedRgRgtc2;
             }
 
-            throw new NotImplementedException(Format.ToString());
+            return PixelInternalFormat.CompressedRgbaBptcUnorm;
         }
 
         public static All GetTextureSwizzle(GalTextureSource Source)
@@ -101,7 +101,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalTextureSource.OneFloat: return All.One;
             }
 
-            throw new ArgumentException(nameof(Source));
+            return All.Zero;
         }
 
         public static TextureWrapMode GetTextureWrapMode(GalTextureWrap Wrap)
@@ -120,7 +120,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalTextureWrap.MirrorClamp:         return TextureWrapMode.Clamp;
             }
 
-            throw new ArgumentException(nameof(Wrap));
+            return TextureWrapMode.Repeat;
         }
 
         public static TextureMinFilter GetTextureMinFilter(
@@ -134,7 +134,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalTextureFilter.Linear:  return TextureMinFilter.Linear;
             }
 
-            throw new ArgumentException(nameof(MinFilter));
+            return TextureMinFilter.Nearest;
         }
 
         public static TextureMagFilter GetTextureMagFilter(GalTextureFilter Filter)
@@ -145,7 +145,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalTextureFilter.Linear:  return TextureMagFilter.Linear;
             }
 
-            throw new ArgumentException(nameof(Filter));
+            return TextureMagFilter.Nearest;
         }
 
         public static BlendEquationMode GetBlendEquation(GalBlendEquation BlendEquation)
@@ -159,7 +159,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalBlendEquation.Max:                 return BlendEquationMode.Max;
             }
 
-            throw new ArgumentException(nameof(BlendEquation));
+            return BlendEquationMode.FuncAdd;
         }
 
         public static BlendingFactorSrc GetBlendFactorSrc(GalBlendFactor BlendFactor)
@@ -187,7 +187,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalBlendFactor.OneMinusSrc1Alpha:     return BlendingFactorSrc.OneMinusSrc1Alpha;
             }
 
-            throw new ArgumentException(nameof(BlendFactor));
+            return BlendingFactorSrc.Zero;
         }
 
         public static BlendingFactorDest GetBlendFactorDst(GalBlendFactor BlendFactor)
@@ -215,7 +215,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalBlendFactor.OneMinusSrc1Alpha:     return BlendingFactorDest.OneMinusSrc1Alpha;
             }
 
-            throw new ArgumentException(nameof(BlendFactor));
+            return BlendingFactorDest.Zero;
         }
     }
 }
