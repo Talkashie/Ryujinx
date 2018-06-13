@@ -58,7 +58,7 @@ namespace Ryujinx.HLE.Gpu
                 }
             }
 
-            throw new NotImplementedException(Texture.Format.ToString());
+            return Texture.Width * Texture.Height * 16;
         }
 
         public static (AMemory Memory, long Position) GetMemoryAndPosition(
