@@ -238,7 +238,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
             if (Status == 0)
             {
-                throw new ShaderException(GL.GetShaderInfoLog(Handle));
+                //throw new ShaderException(GL.GetShaderInfoLog(Handle));
             }
         }
 
@@ -250,7 +250,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
             if (Status == 0)
             {
-                throw new ShaderException(GL.GetProgramInfoLog(Handle));
+                //throw new ShaderException(GL.GetProgramInfoLog(Handle));
             }
         }
     }
