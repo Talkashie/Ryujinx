@@ -179,7 +179,7 @@ namespace Ryujinx.Graphics.Gal.Shader
                 case 3: ChMask = TwoDests ? 0xe : 0x8; break;
                 case 4: ChMask = TwoDests ? 0xf : 0x3; break;
 
-                default: throw new InvalidOperationException();
+                default: ChMask = TwoDests ? 0xf : 0x3; break;
             }
 
             for (int Ch = 0; Ch < 4; Ch++)
