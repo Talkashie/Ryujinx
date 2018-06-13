@@ -121,7 +121,7 @@ namespace Ryujinx.HLE.OsHle.Services.Aud
 
             Context.Ns.Log.PrintStub(LogClass.ServiceAudio, "Stubbed.");
 
-            return 0;
+            return 1;
         }
 
         public long ListAudioDeviceNameAuto(ServiceCtx Context)
