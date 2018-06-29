@@ -96,7 +96,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalTextureFormat.BC5:  return InternalFormat.CompressedRgRgtc2;
             }
 
-            return PixelInternalFormat.CompressedRgbaBptcUnorm;
+            return InternalFormat.CompressedRgbaBptcUnorm;
         }
 
         public static All GetTextureSwizzle(GalTextureSource Source)
@@ -198,7 +198,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
                 case GalBlendFactor.OneMinusSrc1Alpha:     return (BlendingFactor)BlendingFactorSrc.OneMinusSrc1Alpha;
             }
 
-            return BlendingFactorDest.Zero;
+            return BlendingFactor.Zero;
         }
     }
 }
