@@ -1,5 +1,5 @@
 using Ryujinx.Graphics.Gal;
-using System.Threading;
+using Ryujinx.HLE.Gpu.Engines;
 
 namespace Ryujinx.HLE.Gpu
 {
@@ -9,12 +9,9 @@ namespace Ryujinx.HLE.Gpu
 
         public NvGpuFifo Fifo { get; private set; }
 
-        public NvGpuEngine2d Engine2d { get; private set; }
-        public NvGpuEngine3d Engine3d { get; private set; }
-
-        private Thread FifoProcessing;
-
-        private bool KeepRunning;
+        public NvGpuEngine2d  Engine2d  { get; private set; }
+        public NvGpuEngine3d  Engine3d  { get; private set; }
+        public NvGpuEngineDma EngineDma { get; private set; }
 
         public NvGpu(IGalRenderer Renderer)
         {
@@ -22,24 +19,9 @@ namespace Ryujinx.HLE.Gpu
 
             Fifo = new NvGpuFifo(this);
 
-            Engine2d = new NvGpuEngine2d(this);
-            Engine3d = new NvGpuEngine3d(this);
-
-            KeepRunning = true;
-
-            FifoProcessing = new Thread(ProcessFifo);
-
-            FifoProcessing.Start();
-        }
-
-        private void ProcessFifo()
-        {
-            while (KeepRunning)
-            {
-                Fifo.DispatchCalls();
-
-                Thread.Yield();
-            }
+            Engine2d  = new NvGpuEngine2d(this);
+            Engine3d  = new NvGpuEngine3d(this);
+            EngineDma = new NvGpuEngineDma(this);
         }
     }
 }

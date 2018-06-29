@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace Ryujinx.Graphics.Gal.OpenGL
 {
-    class OGLRasterizer
+    public class OGLRasterizer : IGalRasterizer
     {
         private static Dictionary<GalVertexAttribSize, int> AttribElements =
                    new Dictionary<GalVertexAttribSize, int>()
@@ -54,6 +54,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
         private struct IbInfo
         {
             public int Count;
+            public int ElemSizeLog2;
 
             public DrawElementsType Type;
         }
@@ -70,19 +71,15 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             IndexBuffer = new IbInfo();
         }
 
-        public void ClearBuffers(int RtIndex, GalClearBufferFlags Flags)
+        public void ClearBuffers(GalClearBufferFlags Flags)
         {
-            ClearBufferMask Mask = 0;
+            ClearBufferMask Mask = ClearBufferMask.ColorBufferBit;
 
-            //OpenGL doesn't support clearing just a single color channel,
-            //so we can't just clear all channels...
-            if (Flags.HasFlag(GalClearBufferFlags.ColorRed)   &&
-                Flags.HasFlag(GalClearBufferFlags.ColorGreen) &&
-                Flags.HasFlag(GalClearBufferFlags.ColorBlue)  &&
-                Flags.HasFlag(GalClearBufferFlags.ColorAlpha))
-            {
-                Mask = ClearBufferMask.ColorBufferBit;
-            }
+            GL.ColorMask(
+                Flags.HasFlag(GalClearBufferFlags.ColorRed),
+                Flags.HasFlag(GalClearBufferFlags.ColorGreen),
+                Flags.HasFlag(GalClearBufferFlags.ColorBlue),
+                Flags.HasFlag(GalClearBufferFlags.ColorAlpha));
 
             if (Flags.HasFlag(GalClearBufferFlags.Depth))
             {
@@ -95,47 +92,72 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             }
 
             GL.Clear(Mask);
+
+            GL.ColorMask(true, true, true, true);
         }
 
-        public bool IsVboCached(long Tag, long DataSize)
+        public bool IsVboCached(long Key, long DataSize)
         {
-            return VboCache.TryGetSize(Tag, out long Size) && Size == DataSize;
+            return VboCache.TryGetSize(Key, out long Size) && Size == DataSize;
         }
 
-        public bool IsIboCached(long Tag, long DataSize)
+        public bool IsIboCached(long Key, long DataSize)
         {
-            return IboCache.TryGetSize(Tag, out long Size) && Size == DataSize;
+            return IboCache.TryGetSize(Key, out long Size) && Size == DataSize;
         }
 
-        public void CreateVbo(long Tag, byte[] Buffer)
+        public void EnableCullFace()
+        {
+            GL.Enable(EnableCap.CullFace);
+        }
+
+        public void DisableCullFace()
+        {
+            GL.Disable(EnableCap.CullFace);
+        }
+
+        public void EnableDepthTest()
+        {
+            GL.Enable(EnableCap.DepthTest);
+        }
+
+        public void DisableDepthTest()
+        {
+            GL.Disable(EnableCap.DepthTest);
+        }
+
+        public void SetDepthFunction(GalComparisonOp Func)
+        {
+            GL.DepthFunc(OGLEnumConverter.GetDepthFunc(Func));
+        }
+
+        public void CreateVbo(long Key, byte[] Buffer)
         {
             int Handle = GL.GenBuffer();
 
-            VboCache.AddOrUpdate(Tag, Handle, (uint)Buffer.Length);
+            VboCache.AddOrUpdate(Key, Handle, (uint)Buffer.Length);
 
             IntPtr Length = new IntPtr(Buffer.Length);
 
             GL.BindBuffer(BufferTarget.ArrayBuffer, Handle);
             GL.BufferData(BufferTarget.ArrayBuffer, Length, Buffer, BufferUsageHint.StreamDraw);
-            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
         }
 
-        public void CreateIbo(long Tag, byte[] Buffer)
+        public void CreateIbo(long Key, byte[] Buffer)
         {
             int Handle = GL.GenBuffer();
 
-            IboCache.AddOrUpdate(Tag, Handle, (uint)Buffer.Length);
+            IboCache.AddOrUpdate(Key, Handle, (uint)Buffer.Length);
 
             IntPtr Length = new IntPtr(Buffer.Length);
 
             GL.BindBuffer(BufferTarget.ElementArrayBuffer, Handle);
             GL.BufferData(BufferTarget.ElementArrayBuffer, Length, Buffer, BufferUsageHint.StreamDraw);
-            GL.BindBuffer(BufferTarget.ElementArrayBuffer, 0);
         }
 
-        public void SetVertexArray(int VbIndex, int Stride, long VboTag, GalVertexAttrib[] Attribs)
+        public void SetVertexArray(int VbIndex, int Stride, long VboKey, GalVertexAttrib[] Attribs)
         {
-            if (!VboCache.TryGetValue(VboTag, out int VboHandle))
+            if (!VboCache.TryGetValue(VboKey, out int VboHandle))
             {
                 return;
             }
@@ -178,15 +200,15 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
                 GL.VertexAttribPointer(Attrib.Index, Size, Type, Normalize, Stride, Offset);
             }
-
-            GL.BindVertexArray(0);
         }
 
-        public void SetIndexArray(long Tag, int Size, GalIndexFormat Format)
+        public void SetIndexArray(long Key, int Size, GalIndexFormat Format)
         {
             IndexBuffer.Type = OGLEnumConverter.GetDrawElementsType(Format);
 
             IndexBuffer.Count = Size >> (int)Format;
+
+            IndexBuffer.ElemSizeLog2 = (int)Format;
         }
 
         public void DrawArrays(int First, int PrimCount, GalPrimitiveType PrimType)
@@ -201,9 +223,9 @@ namespace Ryujinx.Graphics.Gal.OpenGL
             GL.DrawArrays(OGLEnumConverter.GetPrimitiveType(PrimType), First, PrimCount);
         }
 
-        public void DrawElements(long IboTag, int First, GalPrimitiveType PrimType)
+        public void DrawElements(long IboKey, int First, int VertexBase, GalPrimitiveType PrimType)
         {
-            if (!IboCache.TryGetValue(IboTag, out int IboHandle))
+            if (!IboCache.TryGetValue(IboKey, out int IboHandle))
             {
                 return;
             }
@@ -214,7 +236,18 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
             GL.BindBuffer(BufferTarget.ElementArrayBuffer, IboHandle);
 
-            GL.DrawElements(Mode, IndexBuffer.Count, IndexBuffer.Type, First);
+            First <<= IndexBuffer.ElemSizeLog2;
+
+            if (VertexBase != 0)
+            {
+                IntPtr Indices = new IntPtr(First);
+
+                GL.DrawElementsBaseVertex(Mode, IndexBuffer.Count, IndexBuffer.Type, Indices, VertexBase);
+            }
+            else
+            {
+                GL.DrawElements(Mode, IndexBuffer.Count, IndexBuffer.Type, First);
+            }
         }
     }
 }

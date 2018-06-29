@@ -1,6 +1,5 @@
 using ChocolArm64.Translation;
 using System;
-using System.Numerics;
 
 namespace ChocolArm64.Instruction
 {
@@ -153,12 +152,26 @@ namespace ChocolArm64.Instruction
 
         public static long SMulHi128(long LHS, long RHS)
         {
-            return (long)(BigInteger.Multiply(LHS, RHS) >> 64);
+            long Result = (long)UMulHi128((ulong)(LHS), (ulong)(RHS));
+            if (LHS < 0) Result -= RHS;
+            if (RHS < 0) Result -= LHS;
+            return Result;
         }
 
         public static ulong UMulHi128(ulong LHS, ulong RHS)
         {
-            return (ulong)(BigInteger.Multiply(LHS, RHS) >> 64);
+            //long multiplication
+            //multiply 32 bits at a time in 64 bit, the result is what's carried over 64 bits.
+            ulong LHigh = LHS >> 32;
+            ulong LLow = LHS & 0xFFFFFFFF;
+            ulong RHigh = RHS >> 32;
+            ulong RLow = RHS & 0xFFFFFFFF;
+            ulong Z2 = LLow * RLow;
+            ulong T = LHigh * RLow + (Z2 >> 32);
+            ulong Z1 = T & 0xFFFFFFFF;
+            ulong Z0 = T >> 32;
+            Z1 += LLow * RHigh;
+            return LHigh * RHigh + Z0 + (Z1 >> 32);
         }
     }
 }

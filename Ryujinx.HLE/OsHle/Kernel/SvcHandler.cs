@@ -72,7 +72,8 @@ namespace Ryujinx.HLE.OsHle.Kernel
                 { 0x29, SvcGetInfo                       },
                 { 0x2c, SvcMapPhysicalMemory             },
                 { 0x2d, SvcUnmapPhysicalMemory           },
-                { 0x32, SvcSetThreadActivity             }
+                { 0x32, SvcSetThreadActivity             },
+                { 0x33, SvcGetThreadContext3             }
             };
 
             this.Ns      = Ns;
@@ -92,6 +93,8 @@ namespace Ryujinx.HLE.OsHle.Kernel
         public void SvcCall(object sender, AInstExceptionEventArgs e)
         {
             AThreadState ThreadState = (AThreadState)sender;
+
+            Process.GetThread(ThreadState.Tpidr).LastPc = e.Position;
 
             if (SvcFuncs.TryGetValue(e.Id, out SvcFunc Func))
             {

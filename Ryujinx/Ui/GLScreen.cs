@@ -20,6 +20,10 @@ namespace Ryujinx
 
         private IGalRenderer Renderer;
 
+        private KeyboardState? Keyboard = null;
+
+        private MouseState? Mouse = null;
+
         public GLScreen(Switch Ns, IGalRenderer Renderer)
             : base(1280, 720,
             new GraphicsMode(), "Ryujinx", 0,
@@ -38,7 +42,7 @@ namespace Ryujinx
         {
             VSync = VSyncMode.On;
 
-            Renderer.SetWindowSize(Width, Height);
+            Renderer.FrameBuffer.SetWindowSize(Width, Height);
         }
 
         protected override void OnUpdateFrame(FrameEventArgs e)
@@ -47,44 +51,49 @@ namespace Ryujinx
             HidJoystickPosition LeftJoystick;
             HidJoystickPosition RightJoystick;
 
-            if (Keyboard[Key.Escape]) this.Exit();
-
             int LeftJoystickDX = 0;
             int LeftJoystickDY = 0;
             int RightJoystickDX = 0;
             int RightJoystickDY = 0;
 
-            //RightJoystick
-            if (Keyboard[(Key)Config.FakeJoyCon.Left.StickUp])    LeftJoystickDY = short.MaxValue;
-            if (Keyboard[(Key)Config.FakeJoyCon.Left.StickDown])  LeftJoystickDY = -short.MaxValue;
-            if (Keyboard[(Key)Config.FakeJoyCon.Left.StickLeft])  LeftJoystickDX = -short.MaxValue;
-            if (Keyboard[(Key)Config.FakeJoyCon.Left.StickRight]) LeftJoystickDX = short.MaxValue;
+            if (Keyboard.HasValue)
+            {
+                KeyboardState Keyboard = this.Keyboard.Value;
 
-            //LeftButtons
-            if (Keyboard[(Key)Config.FakeJoyCon.Left.StickButton]) CurrentButton |= HidControllerButtons.KEY_LSTICK;
-            if (Keyboard[(Key)Config.FakeJoyCon.Left.DPadUp])      CurrentButton |= HidControllerButtons.KEY_DUP;
-            if (Keyboard[(Key)Config.FakeJoyCon.Left.DPadDown])    CurrentButton |= HidControllerButtons.KEY_DDOWN;
-            if (Keyboard[(Key)Config.FakeJoyCon.Left.DPadLeft])    CurrentButton |= HidControllerButtons.KEY_DLEFT;
-            if (Keyboard[(Key)Config.FakeJoyCon.Left.DPadRight])   CurrentButton |= HidControllerButtons.KEY_DRIGHT;
-            if (Keyboard[(Key)Config.FakeJoyCon.Left.ButtonMinus]) CurrentButton |= HidControllerButtons.KEY_MINUS;
-            if (Keyboard[(Key)Config.FakeJoyCon.Left.ButtonL])     CurrentButton |= HidControllerButtons.KEY_L;
-            if (Keyboard[(Key)Config.FakeJoyCon.Left.ButtonZL])    CurrentButton |= HidControllerButtons.KEY_ZL;
+                if (Keyboard[Key.Escape]) this.Exit();
 
-            //RightJoystick
-            if (Keyboard[(Key)Config.FakeJoyCon.Right.StickUp])    RightJoystickDY = short.MaxValue;
-            if (Keyboard[(Key)Config.FakeJoyCon.Right.StickDown])  RightJoystickDY = -short.MaxValue;
-            if (Keyboard[(Key)Config.FakeJoyCon.Right.StickLeft])  RightJoystickDX = -short.MaxValue;
-            if (Keyboard[(Key)Config.FakeJoyCon.Right.StickRight]) RightJoystickDX = short.MaxValue;
+                //RightJoystick
+                if (Keyboard[(Key)Config.FakeJoyCon.Left.StickUp])    LeftJoystickDY = short.MaxValue;
+                if (Keyboard[(Key)Config.FakeJoyCon.Left.StickDown])  LeftJoystickDY = -short.MaxValue;
+                if (Keyboard[(Key)Config.FakeJoyCon.Left.StickLeft])  LeftJoystickDX = -short.MaxValue;
+                if (Keyboard[(Key)Config.FakeJoyCon.Left.StickRight]) LeftJoystickDX = short.MaxValue;
 
-            //RightButtons
-            if (Keyboard[(Key)Config.FakeJoyCon.Right.StickButton]) CurrentButton |= HidControllerButtons.KEY_RSTICK;
-            if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonA])     CurrentButton |= HidControllerButtons.KEY_A;
-            if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonB])     CurrentButton |= HidControllerButtons.KEY_B;
-            if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonX])     CurrentButton |= HidControllerButtons.KEY_X;
-            if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonY])     CurrentButton |= HidControllerButtons.KEY_Y;
-            if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonPlus])  CurrentButton |= HidControllerButtons.KEY_PLUS;
-            if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonR])     CurrentButton |= HidControllerButtons.KEY_R;
-            if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonZR])    CurrentButton |= HidControllerButtons.KEY_ZR;
+                //LeftButtons
+                if (Keyboard[(Key)Config.FakeJoyCon.Left.StickButton]) CurrentButton |= HidControllerButtons.KEY_LSTICK;
+                if (Keyboard[(Key)Config.FakeJoyCon.Left.DPadUp])      CurrentButton |= HidControllerButtons.KEY_DUP;
+                if (Keyboard[(Key)Config.FakeJoyCon.Left.DPadDown])    CurrentButton |= HidControllerButtons.KEY_DDOWN;
+                if (Keyboard[(Key)Config.FakeJoyCon.Left.DPadLeft])    CurrentButton |= HidControllerButtons.KEY_DLEFT;
+                if (Keyboard[(Key)Config.FakeJoyCon.Left.DPadRight])   CurrentButton |= HidControllerButtons.KEY_DRIGHT;
+                if (Keyboard[(Key)Config.FakeJoyCon.Left.ButtonMinus]) CurrentButton |= HidControllerButtons.KEY_MINUS;
+                if (Keyboard[(Key)Config.FakeJoyCon.Left.ButtonL])     CurrentButton |= HidControllerButtons.KEY_L;
+                if (Keyboard[(Key)Config.FakeJoyCon.Left.ButtonZL])    CurrentButton |= HidControllerButtons.KEY_ZL;
+
+                //RightJoystick
+                if (Keyboard[(Key)Config.FakeJoyCon.Right.StickUp])    RightJoystickDY = short.MaxValue;
+                if (Keyboard[(Key)Config.FakeJoyCon.Right.StickDown])  RightJoystickDY = -short.MaxValue;
+                if (Keyboard[(Key)Config.FakeJoyCon.Right.StickLeft])  RightJoystickDX = -short.MaxValue;
+                if (Keyboard[(Key)Config.FakeJoyCon.Right.StickRight]) RightJoystickDX = short.MaxValue;
+
+                //RightButtons
+                if (Keyboard[(Key)Config.FakeJoyCon.Right.StickButton]) CurrentButton |= HidControllerButtons.KEY_RSTICK;
+                if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonA])     CurrentButton |= HidControllerButtons.KEY_A;
+                if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonB])     CurrentButton |= HidControllerButtons.KEY_B;
+                if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonX])     CurrentButton |= HidControllerButtons.KEY_X;
+                if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonY])     CurrentButton |= HidControllerButtons.KEY_Y;
+                if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonPlus])  CurrentButton |= HidControllerButtons.KEY_PLUS;
+                if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonR])     CurrentButton |= HidControllerButtons.KEY_R;
+                if (Keyboard[(Key)Config.FakeJoyCon.Right.ButtonZR])    CurrentButton |= HidControllerButtons.KEY_ZR;
+            }
 
             LeftJoystick = new HidJoystickPosition
             {
@@ -102,8 +111,10 @@ namespace Ryujinx
 
             //Get screen touch position from left mouse click
             //OpenTK always captures mouse events, even if out of focus, so check if window is focused.
-            if (Focused && Mouse?.GetState().LeftButton == ButtonState.Pressed)
+            if (Focused && Mouse?.LeftButton == ButtonState.Pressed)
             {
+                MouseState Mouse = this.Mouse.Value;
+
                 int ScrnWidth  = Width;
                 int ScrnHeight = Height;
 
@@ -168,28 +179,56 @@ namespace Ryujinx
                 CurrentButton,
                 LeftJoystick,
                 RightJoystick);
+
+            Ns.ProcessFrame();
+
+            Renderer.RunActions();
         }
 
         protected override void OnRenderFrame(FrameEventArgs e)
         {
-            Ns.Statistics.StartSystemFrame();
+            Renderer.FrameBuffer.Render();
 
-            Title = $"Ryujinx Screen - (Vsync: {VSync} - FPS: {Ns.Statistics.SystemFrameRate:0} - Guest FPS: " +
-                $"{Ns.Statistics.GameFrameRate:0})";
+            Ns.Statistics.RecordSystemFrameTime();
 
-            Renderer.RunActions();
-            Renderer.Render();
+            double HostFps = Ns.Statistics.GetSystemFrameRate();
+            double GameFps = Ns.Statistics.GetGameFrameRate();
+
+            Title = $"Ryujinx | Host FPS: {HostFps:0.0} | Game FPS: {GameFps:0.0}";
 
             SwapBuffers();
-
-            Ns.Statistics.EndSystemFrame();
 
             Ns.Os.SignalVsync();
         }
 
         protected override void OnResize(EventArgs e)
         {
-            Renderer.SetWindowSize(Width, Height);
+            Renderer.FrameBuffer.SetWindowSize(Width, Height);
+        }
+
+        protected override void OnKeyDown(KeyboardKeyEventArgs e)
+        {
+            Keyboard = e.Keyboard;
+        }
+
+        protected override void OnKeyUp(KeyboardKeyEventArgs e)
+        {
+            Keyboard = e.Keyboard;
+        }
+
+        protected override void OnMouseDown(MouseButtonEventArgs e)
+        {
+            Mouse = e.Mouse;
+        }
+
+        protected override void OnMouseUp(MouseButtonEventArgs e)
+        {
+            Mouse = e.Mouse;
+        }
+
+        protected override void OnMouseMove(MouseMoveEventArgs e)
+        {
+            Mouse = e.Mouse;
         }
     }
 }

@@ -29,6 +29,8 @@ namespace Ryujinx.HLE.OsHle.Handles
 
         public int WaitHandle { get; set; }
 
+        public long LastPc { get; set; }
+
         public int ThreadId => Thread.ThreadId;
 
         public KThread(
@@ -58,25 +60,31 @@ namespace Ryujinx.HLE.OsHle.Handles
 
         public void UpdatePriority()
         {
-            int OldPriority = ActualPriority;
-
-            int CurrPriority = WantedPriority;
+            bool PriorityChanged;
 
             lock (Process.ThreadSyncLock)
             {
+                int OldPriority = ActualPriority;
+
+                int CurrPriority = WantedPriority;
+
                 foreach (KThread Thread in MutexWaiters)
                 {
-                    if (CurrPriority > Thread.WantedPriority)
+                    int WantedPriority = Thread.WantedPriority;
+
+                    if (CurrPriority > WantedPriority)
                     {
-                        CurrPriority = Thread.WantedPriority;
+                        CurrPriority = WantedPriority;
                     }
                 }
+
+                PriorityChanged = CurrPriority != OldPriority;
+
+                ActualPriority = CurrPriority;
             }
 
-            if (CurrPriority != OldPriority)
+            if (PriorityChanged)
             {
-                ActualPriority = CurrPriority;
-
                 Process.Scheduler.Resort(this);
 
                 MutexOwner?.UpdatePriority();
