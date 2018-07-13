@@ -80,10 +80,10 @@ namespace Ryujinx.HLE.OsHle.Services
 
                 case "lm":
                     return new ILogService();
-                    
+
                 case "mm:u":
                     return new IRequest();
-                    
+
                 case "nfp:user":
                     return new IUserManager();
 
@@ -158,6 +158,9 @@ namespace Ryujinx.HLE.OsHle.Services
 
                 case "vi:u":
                     return new IApplicationRootService();
+
+                case "hwopus":
+                    return new ISystemRootService();
             }
 
             throw new NotImplementedException(Name);
