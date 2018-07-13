@@ -90,7 +90,8 @@ namespace ChocolArm64.Instruction
                     //TODO: This need the half precision floating point type,
                     //that is not yet supported on .NET. We should probably
                     //do our own implementation on the meantime.
-                    throw new NotImplementedException();
+                    //throw new NotImplementedException();
+                    {}
                 }
                 else /* if (SizeF == 1) */
                 {
