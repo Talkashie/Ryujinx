@@ -58,32 +58,7 @@ namespace ChocolArm64.Instruction
 
         public static void Addp_V(AILEmitterCtx Context)
         {
-            AOpCodeSimdReg Op = (AOpCodeSimdReg)Context.CurrOp;
-
-            int Bytes = Context.CurrOp.GetBitsCount() >> 3;
-
-            int Elems = Bytes >> Op.Size;
-            int Half  = Elems >> 1;
-
-            for (int Index = 0; Index < Elems; Index++)
-            {
-                int Elem = (Index & (Half - 1)) << 1;
-
-                EmitVectorExtractZx(Context, Index < Half ? Op.Rn : Op.Rm, Elem + 0, Op.Size);
-                EmitVectorExtractZx(Context, Index < Half ? Op.Rn : Op.Rm, Elem + 1, Op.Size);
-
-                Context.Emit(OpCodes.Add);
-
-                EmitVectorInsertTmp(Context, Index, Op.Size);
-            }
-
-            Context.EmitLdvectmp();
-            Context.EmitStvec(Op.Rd);
-
-            if (Op.RegisterSize == ARegisterSize.SIMD64)
-            {
-                EmitVectorZeroUpper(Context, Op.Rd);
-            }
+            EmitVectorPairwiseOpZx(Context, () => Context.Emit(OpCodes.Add));
         }
 
         public static void Addv_V(AILEmitterCtx Context)
@@ -151,9 +126,9 @@ namespace ChocolArm64.Instruction
             {
                 EmitVectorExtractZx(Context, Op.Rn, Index, 0);
 
-                Context.Emit(OpCodes.Conv_U1);
+                Context.Emit(OpCodes.Conv_U4);
 
-                AVectorHelper.EmitCall(Context, nameof(AVectorHelper.CountSetBits8));
+                ASoftFallback.EmitCall(Context, nameof(ASoftFallback.CountSetBits8));
 
                 Context.Emit(OpCodes.Conv_U8);
 
@@ -666,106 +641,34 @@ namespace ChocolArm64.Instruction
 
         public static void Frecpe_S(AILEmitterCtx Context)
         {
-            EmitFrecpe(Context, 0, Scalar: true);
+            EmitScalarUnaryOpF(Context, () =>
+            {
+                EmitUnarySoftFloatCall(Context, nameof(ASoftFloat.RecipEstimate));
+            });
         }
 
         public static void Frecpe_V(AILEmitterCtx Context)
         {
-            AOpCodeSimd Op = (AOpCodeSimd)Context.CurrOp;
-
-            int SizeF = Op.Size & 1;
-
-            int Bytes = Context.CurrOp.GetBitsCount() >> 3;
-
-            for (int Index = 0; Index < Bytes >> SizeF + 2; Index++)
+            EmitVectorUnaryOpF(Context, () =>
             {
-                EmitFrecpe(Context, Index, Scalar: false);
-            }
-
-            if (Op.RegisterSize == ARegisterSize.SIMD64)
-            {
-                EmitVectorZeroUpper(Context, Op.Rd);
-            }
-        }
-
-        private static void EmitFrecpe(AILEmitterCtx Context, int Index, bool Scalar)
-        {
-            AOpCodeSimd Op = (AOpCodeSimd)Context.CurrOp;
-
-            int SizeF = Op.Size & 1;
-
-            if (SizeF == 0)
-            {
-                Context.EmitLdc_R4(1);
-            }
-            else /* if (SizeF == 1) */
-            {
-                Context.EmitLdc_R8(1);
-            }
-
-            EmitVectorExtractF(Context, Op.Rn, Index, SizeF);
-
-            Context.Emit(OpCodes.Div);
-
-            if (Scalar)
-            {
-                EmitVectorZeroAll(Context, Op.Rd);
-            }
-
-            EmitVectorInsertF(Context, Op.Rd, Index, SizeF);
+                EmitUnarySoftFloatCall(Context, nameof(ASoftFloat.RecipEstimate));
+            });
         }
 
         public static void Frecps_S(AILEmitterCtx Context)
         {
-            EmitFrecps(Context, 0, Scalar: true);
+            EmitScalarBinaryOpF(Context, () =>
+            {
+                EmitBinarySoftFloatCall(Context, nameof(ASoftFloat.RecipStep));
+            });
         }
 
         public static void Frecps_V(AILEmitterCtx Context)
         {
-            AOpCodeSimd Op = (AOpCodeSimd)Context.CurrOp;
-
-            int SizeF = Op.Size & 1;
-
-            int Bytes = Context.CurrOp.GetBitsCount() >> 3;
-
-            for (int Index = 0; Index < Bytes >> SizeF + 2; Index++)
+            EmitVectorBinaryOpF(Context, () =>
             {
-                EmitFrecps(Context, Index, Scalar: false);
-            }
-
-            if (Op.RegisterSize == ARegisterSize.SIMD64)
-            {
-                EmitVectorZeroUpper(Context, Op.Rd);
-            }
-        }
-
-        private static void EmitFrecps(AILEmitterCtx Context, int Index, bool Scalar)
-        {
-            AOpCodeSimdReg Op = (AOpCodeSimdReg)Context.CurrOp;
-
-            int SizeF = Op.Size & 1;
-
-            if (SizeF == 0)
-            {
-                Context.EmitLdc_R4(2);
-            }
-            else /* if (SizeF == 1) */
-            {
-                Context.EmitLdc_R8(2);
-            }
-
-            EmitVectorExtractF(Context, Op.Rn, Index, SizeF);
-            EmitVectorExtractF(Context, Op.Rm, Index, SizeF);
-
-            Context.Emit(OpCodes.Mul);
-            Context.Emit(OpCodes.Sub);
-
-            if (Scalar)
-            {
-                EmitVectorZeroAll(Context, Op.Rd);
-            }
-
-            EmitVectorInsertF(Context, Op.Rd, Index, SizeF);
+                EmitBinarySoftFloatCall(Context, nameof(ASoftFloat.RecipStep));
+            });
         }
 
         public static void Frinta_S(AILEmitterCtx Context)
@@ -1163,6 +1066,15 @@ namespace ChocolArm64.Instruction
             EmitVectorBinaryOpSx(Context, () => Context.EmitCall(MthdInfo));
         }
 
+        public static void Smaxp_V(AILEmitterCtx Context)
+        {
+            Type[] Types = new Type[] { typeof(long), typeof(long) };
+
+            MethodInfo MthdInfo = typeof(Math).GetMethod(nameof(Math.Max), Types);
+
+            EmitVectorPairwiseOpSx(Context, () => Context.EmitCall(MthdInfo));
+        }
+
         public static void Smin_V(AILEmitterCtx Context)
         {
             Type[] Types = new Type[] { typeof(long), typeof(long) };
@@ -1170,6 +1082,15 @@ namespace ChocolArm64.Instruction
             MethodInfo MthdInfo = typeof(Math).GetMethod(nameof(Math.Min), Types);
 
             EmitVectorBinaryOpSx(Context, () => Context.EmitCall(MthdInfo));
+        }
+
+        public static void Sminp_V(AILEmitterCtx Context)
+        {
+            Type[] Types = new Type[] { typeof(long), typeof(long) };
+
+            MethodInfo MthdInfo = typeof(Math).GetMethod(nameof(Math.Min), Types);
+
+            EmitVectorPairwiseOpSx(Context, () => Context.EmitCall(MthdInfo));
         }
 
         public static void Smlal_V(AILEmitterCtx Context)
@@ -1306,6 +1227,42 @@ namespace ChocolArm64.Instruction
 
                 Context.Emit(OpCodes.Shr_Un);
             });
+        }
+
+        public static void Umin_V(AILEmitterCtx Context)
+        {
+            Type[] Types = new Type[] { typeof(ulong), typeof(ulong) };
+
+            MethodInfo MthdInfo = typeof(Math).GetMethod(nameof(Math.Min), Types);
+
+            EmitVectorBinaryOpZx(Context, () => Context.EmitCall(MthdInfo));
+        }
+
+        public static void Uminp_V(AILEmitterCtx Context)
+        {
+            Type[] Types = new Type[] { typeof(ulong), typeof(ulong) };
+
+            MethodInfo MthdInfo = typeof(Math).GetMethod(nameof(Math.Min), Types);
+
+            EmitVectorPairwiseOpZx(Context, () => Context.EmitCall(MthdInfo));
+        }
+
+        public static void Umax_V(AILEmitterCtx Context)
+        {
+            Type[] Types = new Type[] { typeof(ulong), typeof(ulong) };
+
+            MethodInfo MthdInfo = typeof(Math).GetMethod(nameof(Math.Max), Types);
+
+            EmitVectorBinaryOpZx(Context, () => Context.EmitCall(MthdInfo));
+        }
+
+        public static void Umaxp_V(AILEmitterCtx Context)
+        {
+            Type[] Types = new Type[] { typeof(ulong), typeof(ulong) };
+
+            MethodInfo MthdInfo = typeof(Math).GetMethod(nameof(Math.Max), Types);
+
+            EmitVectorPairwiseOpZx(Context, () => Context.EmitCall(MthdInfo));
         }
 
         public static void Umull_V(AILEmitterCtx Context)
