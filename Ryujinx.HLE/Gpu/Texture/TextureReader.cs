@@ -13,12 +13,18 @@ namespace Ryujinx.HLE.Gpu.Texture
                 case GalTextureFormat.R32G32B32A32: return Read16Bpp                 (Memory, Texture);
                 case GalTextureFormat.R16G16B16A16: return Read8Bpp                  (Memory, Texture);
                 case GalTextureFormat.A8B8G8R8:     return Read4Bpp                  (Memory, Texture);
+                case GalTextureFormat.A2B10G10R10:  return Read4Bpp                  (Memory, Texture);
                 case GalTextureFormat.R32:          return Read4Bpp                  (Memory, Texture);
+                case GalTextureFormat.BF10GF11RF11: return Read4Bpp                  (Memory, Texture);
+                case GalTextureFormat.Z24S8:        return Read4Bpp                  (Memory, Texture);
                 case GalTextureFormat.A1B5G5R5:     return Read5551                  (Memory, Texture);
                 case GalTextureFormat.B5G6R5:       return Read565                   (Memory, Texture);
+                case GalTextureFormat.A4B4G4R4:     return Read2Bpp                  (Memory, Texture);
                 case GalTextureFormat.G8R8:         return Read2Bpp                  (Memory, Texture);
                 case GalTextureFormat.R16:          return Read2Bpp                  (Memory, Texture);
                 case GalTextureFormat.R8:           return Read1Bpp                  (Memory, Texture);
+                case GalTextureFormat.BC6H_SF16:    return Read16BptCompressedTexture(Memory, Texture, 4, 4);
+                case GalTextureFormat.BC6H_UF16:    return Read16BptCompressedTexture(Memory, Texture, 4, 4);
                 case GalTextureFormat.BC7U:         return Read16BptCompressedTexture(Memory, Texture, 4, 4);
                 case GalTextureFormat.BC1:          return Read8Bpt4x4               (Memory, Texture);
                 case GalTextureFormat.BC2:          return Read16BptCompressedTexture(Memory, Texture, 4, 4);
@@ -40,9 +46,9 @@ namespace Ryujinx.HLE.Gpu.Texture
                 case GalTextureFormat.Astc2D8x5:    return Read16BptCompressedTexture(Memory, Texture, 8, 5);
                 case GalTextureFormat.Astc2D10x5:   return Read16BptCompressedTexture(Memory, Texture, 10, 5);
                 case GalTextureFormat.Astc2D10x6:   return Read16BptCompressedTexture(Memory, Texture, 10, 6);
-            }
-
-            return Read8Bpt4x4               (Memory, Texture);
+             }
+             return Read16Bpp                 (Memory, Texture);
+            //throw new NotImplementedException("0x" + Texture.Format.ToString("x2"));
         }
 
         private unsafe static byte[] Read1Bpp(IAMemory Memory, TextureInfo Texture)
@@ -52,7 +58,7 @@ namespace Ryujinx.HLE.Gpu.Texture
 
             byte[] Output = new byte[Width * Height];
 
-            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, Width, 1);
+            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, 1, 1);
 
             (AMemory CpuMem, long Position) = TextureHelper.GetMemoryAndPosition(
                 Memory,
@@ -67,7 +73,7 @@ namespace Ryujinx.HLE.Gpu.Texture
                 {
                     long Offset = (uint)Swizzle.GetSwizzleOffset(X, Y);
 
-                    byte Pixel = CpuMem.ReadByteUnchecked(Position + Offset);
+                    byte Pixel = CpuMem.ReadByte(Position + Offset);
 
                     *(BuffPtr + OutOffs) = Pixel;
 
@@ -85,7 +91,7 @@ namespace Ryujinx.HLE.Gpu.Texture
 
             byte[] Output = new byte[Width * Height * 2];
 
-            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, Width, 2);
+            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, 1, 2);
 
             (AMemory CpuMem, long Position) = TextureHelper.GetMemoryAndPosition(
                 Memory,
@@ -100,7 +106,7 @@ namespace Ryujinx.HLE.Gpu.Texture
                 {
                     long Offset = (uint)Swizzle.GetSwizzleOffset(X, Y);
 
-                    uint Pixel = (uint)CpuMem.ReadInt16Unchecked(Position + Offset);
+                    uint Pixel = (uint)CpuMem.ReadInt16(Position + Offset);
 
                     Pixel = (Pixel & 0x001f) << 11 |
                             (Pixel & 0x03e0) << 1  |
@@ -123,7 +129,7 @@ namespace Ryujinx.HLE.Gpu.Texture
 
             byte[] Output = new byte[Width * Height * 2];
 
-            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, Width, 2);
+            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, 1, 2);
 
             (AMemory CpuMem, long Position) = TextureHelper.GetMemoryAndPosition(
                 Memory,
@@ -138,7 +144,7 @@ namespace Ryujinx.HLE.Gpu.Texture
                 {
                     long Offset = (uint)Swizzle.GetSwizzleOffset(X, Y);
 
-                    uint Pixel = (uint)CpuMem.ReadInt16Unchecked(Position + Offset);
+                    uint Pixel = (uint)CpuMem.ReadInt16(Position + Offset);
 
                     Pixel = (Pixel & 0x001f) << 11 |
                             (Pixel & 0x07e0)       |
@@ -160,7 +166,7 @@ namespace Ryujinx.HLE.Gpu.Texture
 
             byte[] Output = new byte[Width * Height * 2];
 
-            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, Width, 2);
+            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, 1, 2);
 
             (AMemory CpuMem, long Position) = TextureHelper.GetMemoryAndPosition(
                 Memory,
@@ -175,7 +181,7 @@ namespace Ryujinx.HLE.Gpu.Texture
                 {
                     long Offset = (uint)Swizzle.GetSwizzleOffset(X, Y);
 
-                    short Pixel = CpuMem.ReadInt16Unchecked(Position + Offset);
+                    short Pixel = CpuMem.ReadInt16(Position + Offset);
 
                     *(short*)(BuffPtr + OutOffs) = Pixel;
 
@@ -193,7 +199,7 @@ namespace Ryujinx.HLE.Gpu.Texture
 
             byte[] Output = new byte[Width * Height * 4];
 
-            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, Width, 4);
+            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, 1, 4);
 
             (AMemory CpuMem, long Position) = TextureHelper.GetMemoryAndPosition(
                 Memory,
@@ -208,7 +214,7 @@ namespace Ryujinx.HLE.Gpu.Texture
                 {
                     long Offset = (uint)Swizzle.GetSwizzleOffset(X, Y);
 
-                    int Pixel = CpuMem.ReadInt32Unchecked(Position + Offset);
+                    int Pixel = CpuMem.ReadInt32(Position + Offset);
 
                     *(int*)(BuffPtr + OutOffs) = Pixel;
 
@@ -226,7 +232,7 @@ namespace Ryujinx.HLE.Gpu.Texture
 
             byte[] Output = new byte[Width * Height * 8];
 
-            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, Width, 8);
+            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, 1, 8);
 
             (AMemory CpuMem, long Position) = TextureHelper.GetMemoryAndPosition(
                 Memory,
@@ -241,7 +247,7 @@ namespace Ryujinx.HLE.Gpu.Texture
                 {
                     long Offset = (uint)Swizzle.GetSwizzleOffset(X, Y);
 
-                    long Pixel = CpuMem.ReadInt64Unchecked(Position + Offset);
+                    long Pixel = CpuMem.ReadInt64(Position + Offset);
 
                     *(long*)(BuffPtr + OutOffs) = Pixel;
 
@@ -259,7 +265,7 @@ namespace Ryujinx.HLE.Gpu.Texture
 
             byte[] Output = new byte[Width * Height * 16];
 
-            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, Width, 16);
+            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, 1, 16);
 
             (AMemory CpuMem, long Position) = TextureHelper.GetMemoryAndPosition(
                 Memory,
@@ -274,8 +280,8 @@ namespace Ryujinx.HLE.Gpu.Texture
                 {
                     long Offset = (uint)Swizzle.GetSwizzleOffset(X, Y);
 
-                    long PxLow  = CpuMem.ReadInt64Unchecked(Position + Offset + 0);
-                    long PxHigh = CpuMem.ReadInt64Unchecked(Position + Offset + 8);
+                    long PxLow  = CpuMem.ReadInt64(Position + Offset + 0);
+                    long PxHigh = CpuMem.ReadInt64(Position + Offset + 8);
 
                     *(long*)(BuffPtr + OutOffs + 0) = PxLow;
                     *(long*)(BuffPtr + OutOffs + 8) = PxHigh;
@@ -294,7 +300,7 @@ namespace Ryujinx.HLE.Gpu.Texture
 
             byte[] Output = new byte[Width * Height * 8];
 
-            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, Width, 8);
+            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, 4, 8);
 
             (AMemory CpuMem, long Position) = TextureHelper.GetMemoryAndPosition(
                 Memory,
@@ -309,7 +315,7 @@ namespace Ryujinx.HLE.Gpu.Texture
                 {
                     long Offset = (uint)Swizzle.GetSwizzleOffset(X, Y);
 
-                    long Tile = CpuMem.ReadInt64Unchecked(Position + Offset);
+                    long Tile = CpuMem.ReadInt64(Position + Offset);
 
                     *(long*)(BuffPtr + OutOffs) = Tile;
 
@@ -327,7 +333,7 @@ namespace Ryujinx.HLE.Gpu.Texture
 
             byte[] Output = new byte[Width * Height * 16];
 
-            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, Width, 16);
+            ISwizzle Swizzle = TextureHelper.GetSwizzle(Texture, BlockWidth, 16);
 
             (AMemory CpuMem, long Position) = TextureHelper.GetMemoryAndPosition(
                 Memory,
@@ -342,8 +348,8 @@ namespace Ryujinx.HLE.Gpu.Texture
                 {
                     long Offset = (uint)Swizzle.GetSwizzleOffset(X, Y);
 
-                    long Tile0 = CpuMem.ReadInt64Unchecked(Position + Offset + 0);
-                    long Tile1 = CpuMem.ReadInt64Unchecked(Position + Offset + 8);
+                    long Tile0 = CpuMem.ReadInt64(Position + Offset + 0);
+                    long Tile1 = CpuMem.ReadInt64(Position + Offset + 8);
 
                     *(long*)(BuffPtr + OutOffs + 0) = Tile0;
                     *(long*)(BuffPtr + OutOffs + 8) = Tile1;

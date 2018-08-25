@@ -3060,6 +3060,322 @@ namespace Ryujinx.Tests.Cpu.Tester
             V(d, result);
         }
 
+        // sadalp_advsimd.html
+        public static void Sadalp_V(bool Q, Bits size, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+            const bool op = true;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            /* if size == '11' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / (2 * esize);
+
+            bool acc = (op == true);
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits operand = V(datasize, n);
+            Bits sum;
+            BigInteger op1;
+            BigInteger op2;
+
+            Bits result = (acc ? V(datasize, d) : Zeros(datasize));
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                op1 = Int(Elem(operand, 2 * e + 0, esize), unsigned);
+                op2 = Int(Elem(operand, 2 * e + 1, esize), unsigned);
+
+                sum = (op1 + op2).SubBigInteger(2 * esize - 1, 0);
+
+                Elem(result, e, 2 * esize, Elem(result, e, 2 * esize) + sum);
+            }
+
+            V(d, result);
+        }
+
+        // saddlp_advsimd.html
+        public static void Saddlp_V(bool Q, Bits size, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+            const bool op = false;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            /* if size == '11' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / (2 * esize);
+
+            bool acc = (op == true);
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits operand = V(datasize, n);
+            Bits sum;
+            BigInteger op1;
+            BigInteger op2;
+
+            Bits result = (acc ? V(datasize, d) : Zeros(datasize));
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                op1 = Int(Elem(operand, 2 * e + 0, esize), unsigned);
+                op2 = Int(Elem(operand, 2 * e + 1, esize), unsigned);
+
+                sum = (op1 + op2).SubBigInteger(2 * esize - 1, 0);
+
+                Elem(result, e, 2 * esize, Elem(result, e, 2 * esize) + sum);
+            }
+
+            V(d, result);
+        }
+
+        // sha256su0_advsimd.html
+        public static void Sha256su0_V(Bits Rn, Bits Rd)
+        {
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            /* if !HaveCryptoExt() then UnallocatedEncoding(); */
+
+            /* Operation */
+            /* CheckCryptoEnabled64(); */
+
+            Bits result = new Bits(128);
+            Bits operand1 = V(128, d);
+            Bits operand2 = V(128, n);
+            Bits T = Bits.Concat(operand2[31, 0], operand1[127, 32]); // bits(128)
+            Bits elt; // bits(32)
+
+            for (int e = 0; e <= 3; e++)
+            {
+                elt = Elem(T, e, 32);
+                elt = EOR(EOR(ROR(elt, 7), ROR(elt, 18)), LSR(elt, 3));
+                Elem(result, e, 32, elt + Elem(operand1, e, 32));
+            }
+
+            V(d, result);
+        }
+
+        // sqabs_advsimd.html#SQABS_asisdmisc_R
+        public static void Sqabs_S(Bits size, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+
+            /* Decode Scalar */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = esize;
+            int elements = 1;
+
+            bool neg = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand = V(datasize, n);
+            BigInteger element;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element = SInt(Elem(operand, e, esize));
+
+                if (neg)
+                {
+                    element = -element;
+                }
+                else
+                {
+                    element = Abs(element);
+                }
+
+                (Bits _result, bool _sat) = SignedSatQ(element, esize);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // sqabs_advsimd.html#SQABS_asimdmisc_R
+        public static void Sqabs_V(bool Q, Bits size, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+
+            bool neg = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand = V(datasize, n);
+            BigInteger element;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element = SInt(Elem(operand, e, esize));
+
+                if (neg)
+                {
+                    element = -element;
+                }
+                else
+                {
+                    element = Abs(element);
+                }
+
+                (Bits _result, bool _sat) = SignedSatQ(element, esize);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // sqneg_advsimd.html#SQNEG_asisdmisc_R
+        public static void Sqneg_S(Bits size, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+
+            /* Decode Scalar */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = esize;
+            int elements = 1;
+
+            bool neg = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand = V(datasize, n);
+            BigInteger element;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element = SInt(Elem(operand, e, esize));
+
+                if (neg)
+                {
+                    element = -element;
+                }
+                else
+                {
+                    element = Abs(element);
+                }
+
+                (Bits _result, bool _sat) = SignedSatQ(element, esize);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // sqneg_advsimd.html#SQNEG_asimdmisc_R
+        public static void Sqneg_V(bool Q, Bits size, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+
+            bool neg = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand = V(datasize, n);
+            BigInteger element;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element = SInt(Elem(operand, e, esize));
+
+                if (neg)
+                {
+                    element = -element;
+                }
+                else
+                {
+                    element = Abs(element);
+                }
+
+                (Bits _result, bool _sat) = SignedSatQ(element, esize);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
         // sqxtn_advsimd.html#SQXTN_asisdmisc_N
         public static void Sqxtn_S(Bits size, Bits Rn, Bits Rd)
         {
@@ -3228,6 +3544,180 @@ namespace Ryujinx.Tests.Cpu.Tester
             Vpart(d, part, result);
         }
 
+        // suqadd_advsimd.html#SUQADD_asisdmisc_R
+        public static void Suqadd_S(Bits size, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+
+            /* Decode Scalar */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = esize;
+            int elements = 1;
+
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand = V(datasize, n);
+            Bits operand2 = V(datasize, d);
+            BigInteger op1;
+            BigInteger op2;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                op1 = Int(Elem(operand, e, esize), !unsigned);
+                op2 = Int(Elem(operand2, e, esize), unsigned);
+
+                (Bits _result, bool _sat) = SatQ(op1 + op2, esize, unsigned);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // suqadd_advsimd.html#SUQADD_asimdmisc_R
+        public static void Suqadd_V(bool Q, Bits size, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand = V(datasize, n);
+            Bits operand2 = V(datasize, d);
+            BigInteger op1;
+            BigInteger op2;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                op1 = Int(Elem(operand, e, esize), !unsigned);
+                op2 = Int(Elem(operand2, e, esize), unsigned);
+
+                (Bits _result, bool _sat) = SatQ(op1 + op2, esize, unsigned);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // uadalp_advsimd.html
+        public static void Uadalp_V(bool Q, Bits size, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+            const bool op = true;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            /* if size == '11' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / (2 * esize);
+
+            bool acc = (op == true);
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits operand = V(datasize, n);
+            Bits sum;
+            BigInteger op1;
+            BigInteger op2;
+
+            Bits result = (acc ? V(datasize, d) : Zeros(datasize));
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                op1 = Int(Elem(operand, 2 * e + 0, esize), unsigned);
+                op2 = Int(Elem(operand, 2 * e + 1, esize), unsigned);
+
+                sum = (op1 + op2).SubBigInteger(2 * esize - 1, 0);
+
+                Elem(result, e, 2 * esize, Elem(result, e, 2 * esize) + sum);
+            }
+
+            V(d, result);
+        }
+
+        // uaddlp_advsimd.html
+        public static void Uaddlp_V(bool Q, Bits size, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+            const bool op = false;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            /* if size == '11' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / (2 * esize);
+
+            bool acc = (op == true);
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits operand = V(datasize, n);
+            Bits sum;
+            BigInteger op1;
+            BigInteger op2;
+
+            Bits result = (acc ? V(datasize, d) : Zeros(datasize));
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                op1 = Int(Elem(operand, 2 * e + 0, esize), unsigned);
+                op2 = Int(Elem(operand, 2 * e + 1, esize), unsigned);
+
+                sum = (op1 + op2).SubBigInteger(2 * esize - 1, 0);
+
+                Elem(result, e, 2 * esize, Elem(result, e, 2 * esize) + sum);
+            }
+
+            V(d, result);
+        }
+
         // uqxtn_advsimd.html#UQXTN_asisdmisc_N
         public static void Uqxtn_S(Bits size, Bits Rn, Bits Rd)
         {
@@ -3311,6 +3801,127 @@ namespace Ryujinx.Tests.Cpu.Tester
                     /* FPSR.QC = '1'; */
                     FPSR[27] = true; // TODO: Add named fields.
                 }
+            }
+
+            Vpart(d, part, result);
+        }
+
+        // usqadd_advsimd.html#USQADD_asisdmisc_R
+        public static void Usqadd_S(Bits size, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+
+            /* Decode Scalar */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = esize;
+            int elements = 1;
+
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand = V(datasize, n);
+            Bits operand2 = V(datasize, d);
+            BigInteger op1;
+            BigInteger op2;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                op1 = Int(Elem(operand, e, esize), !unsigned);
+                op2 = Int(Elem(operand2, e, esize), unsigned);
+
+                (Bits _result, bool _sat) = SatQ(op1 + op2, esize, unsigned);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // usqadd_advsimd.html#USQADD_asimdmisc_R
+        public static void Usqadd_V(bool Q, Bits size, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand = V(datasize, n);
+            Bits operand2 = V(datasize, d);
+            BigInteger op1;
+            BigInteger op2;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                op1 = Int(Elem(operand, e, esize), !unsigned);
+                op2 = Int(Elem(operand2, e, esize), unsigned);
+
+                (Bits _result, bool _sat) = SatQ(op1 + op2, esize, unsigned);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // xtn_advsimd.html
+        public static void Xtn_V(bool Q, Bits size, Bits Rn, Bits Rd)
+        {
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+
+            /* if size == '11' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = 64;
+            int part = (int)UInt(Q);
+            int elements = datasize / esize;
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand = V(2 * datasize, n);
+            Bits element;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element = Elem(operand, e, 2 * esize);
+
+                Elem(result, e, esize, element[esize - 1, 0]);
             }
 
             Vpart(d, part, result);
@@ -4395,8 +5006,8 @@ namespace Ryujinx.Tests.Cpu.Tester
             int part = (int)UInt(Q);
             int elements = datasize / esize;
 
-            bool unsigned = (U == true);
             bool accumulate = (op == false);
+            bool unsigned = (U == true);
 
             /* Operation */
             /* CheckFPAdvSIMDEnabled64(); */
@@ -4484,8 +5095,8 @@ namespace Ryujinx.Tests.Cpu.Tester
             int part = (int)UInt(Q);
             int elements = datasize / esize;
 
-            bool unsigned = (U == true);
             bool accumulate = (op == false);
+            bool unsigned = (U == true);
 
             /* Operation */
             /* CheckFPAdvSIMDEnabled64(); */
@@ -4506,6 +5117,586 @@ namespace Ryujinx.Tests.Cpu.Tester
                 absdiff = Abs(element1 - element2).SubBigInteger(2 * esize - 1, 0);
 
                 Elem(result, e, 2 * esize, Elem(result, e, 2 * esize) + absdiff);
+            }
+
+            V(d, result);
+        }
+
+        // saddw_advsimd.html
+        public static void Saddw_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+            const bool o1 = false;
+
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size == '11' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = 64;
+            int part = (int)UInt(Q);
+            int elements = datasize / esize;
+
+            bool sub_op = (o1 == true);
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(2 * datasize);
+            Bits operand1 = V(2 * datasize, n);
+            Bits operand2 = Vpart(datasize, m, part);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger sum;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = Int(Elem(operand1, e, 2 * esize), unsigned);
+                element2 = Int(Elem(operand2, e, esize), unsigned);
+
+                if (sub_op)
+                {
+                    sum = element1 - element2;
+                }
+                else
+                {
+                    sum = element1 + element2;
+                }
+
+                Elem(result, e, 2 * esize, sum.SubBigInteger(2 * esize - 1, 0));
+            }
+
+            V(d, result);
+        }
+
+        // sha256h_advsimd.html
+        public static void Sha256h_V(Bits Rm, Bits Rn, Bits Rd)
+        {
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if !HaveCryptoExt() then UnallocatedEncoding(); */
+
+            /* Operation */
+            /* CheckCryptoEnabled64(); */
+
+            Bits result = SHA256hash(V(128, d), V(128, n), V(128, m), true);
+
+            V(d, result);
+        }
+
+        // sha256h2_advsimd.html
+        public static void Sha256h2_V(Bits Rm, Bits Rn, Bits Rd)
+        {
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if !HaveCryptoExt() then UnallocatedEncoding(); */
+
+            /* Operation */
+            /* CheckCryptoEnabled64(); */
+
+            Bits result = SHA256hash(V(128, n), V(128, d), V(128, m), false);
+
+            V(d, result);
+        }
+
+        // sha256su1_advsimd.html
+        public static void Sha256su1_V(Bits Rm, Bits Rn, Bits Rd)
+        {
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if !HaveCryptoExt() then UnallocatedEncoding(); */
+
+            /* Operation */
+            /* CheckCryptoEnabled64(); */
+
+            Bits result = new Bits(128);
+            Bits operand1 = V(128, d);
+            Bits operand2 = V(128, n);
+            Bits operand3 = V(128, m);
+            Bits T0 = Bits.Concat(operand3[31, 0], operand2[127, 32]); // bits(128)
+            Bits T1; // bits(64)
+            Bits elt; // bits(32)
+
+            T1 = operand3[127, 64];
+            for (int e = 0; e <= 1; e++)
+            {
+                elt = Elem(T1, e, 32);
+                elt = EOR(EOR(ROR(elt, 17), ROR(elt, 19)), LSR(elt, 10));
+                elt = elt + Elem(operand1, e, 32) + Elem(T0, e, 32);
+                Elem(result, e, 32, elt);
+            }
+
+            T1 = result[63, 0];
+            for (int e = 2; e <= 3; e++)
+            {
+                elt = Elem(T1, e - 2, 32);
+                elt = EOR(EOR(ROR(elt, 17), ROR(elt, 19)), LSR(elt, 10));
+                elt = elt + Elem(operand1, e, 32) + Elem(T0, e, 32);
+                Elem(result, e, 32, elt);
+            }
+
+            V(d, result);
+        }
+
+        // sqadd_advsimd.html#SQADD_asisdsame_only
+        public static void Sqadd_S(Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+
+            /* Decode Scalar */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = esize;
+            int elements = 1;
+
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger sum;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = Int(Elem(operand1, e, esize), unsigned);
+                element2 = Int(Elem(operand2, e, esize), unsigned);
+
+                sum = element1 + element2;
+
+                (Bits _result, bool _sat) = SatQ(sum, esize, unsigned);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // sqadd_advsimd.html#SQADD_asimdsame_only
+        public static void Sqadd_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger sum;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = Int(Elem(operand1, e, esize), unsigned);
+                element2 = Int(Elem(operand2, e, esize), unsigned);
+
+                sum = element1 + element2;
+
+                (Bits _result, bool _sat) = SatQ(sum, esize, unsigned);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // sqdmulh_advsimd_vec.html#SQDMULH_asisdsame_only
+        public static void Sqdmulh_S(Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+
+            /* Decode Scalar */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size == '11' || size == '00' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = esize;
+            int elements = 1;
+
+            bool rounding = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+            BigInteger round_const = (rounding ? (BigInteger)1 << (esize - 1) : 0);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger product;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = SInt(Elem(operand1, e, esize));
+                element2 = SInt(Elem(operand2, e, esize));
+
+                product = (2 * element1 * element2) + round_const;
+
+                (Bits _result, bool _sat) = SignedSatQ(product >> esize, esize);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // sqdmulh_advsimd_vec.html#SQDMULH_asimdsame_only
+        public static void Sqdmulh_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size == '11' || size == '00' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+
+            bool rounding = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+            BigInteger round_const = (rounding ? (BigInteger)1 << (esize - 1) : 0);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger product;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = SInt(Elem(operand1, e, esize));
+                element2 = SInt(Elem(operand2, e, esize));
+
+                product = (2 * element1 * element2) + round_const;
+
+                (Bits _result, bool _sat) = SignedSatQ(product >> esize, esize);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // sqrdmulh_advsimd_vec.html#SQRDMULH_asisdsame_only
+        public static void Sqrdmulh_S(Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+
+            /* Decode Scalar */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size == '11' || size == '00' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = esize;
+            int elements = 1;
+
+            bool rounding = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+            BigInteger round_const = (rounding ? (BigInteger)1 << (esize - 1) : 0);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger product;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = SInt(Elem(operand1, e, esize));
+                element2 = SInt(Elem(operand2, e, esize));
+
+                product = (2 * element1 * element2) + round_const;
+
+                (Bits _result, bool _sat) = SignedSatQ(product >> esize, esize);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // sqrdmulh_advsimd_vec.html#SQRDMULH_asimdsame_only
+        public static void Sqrdmulh_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size == '11' || size == '00' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+
+            bool rounding = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+            BigInteger round_const = (rounding ? (BigInteger)1 << (esize - 1) : 0);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger product;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = SInt(Elem(operand1, e, esize));
+                element2 = SInt(Elem(operand2, e, esize));
+
+                product = (2 * element1 * element2) + round_const;
+
+                (Bits _result, bool _sat) = SignedSatQ(product >> esize, esize);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // sqsub_advsimd.html#SQSUB_asisdsame_only
+        public static void Sqsub_S(Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+
+            /* Decode Scalar */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = esize;
+            int elements = 1;
+
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger diff;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = Int(Elem(operand1, e, esize), unsigned);
+                element2 = Int(Elem(operand2, e, esize), unsigned);
+
+                diff = element1 - element2;
+
+                (Bits _result, bool _sat) = SatQ(diff, esize, unsigned);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // sqsub_advsimd.html#SQSUB_asimdsame_only
+        public static void Sqsub_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger diff;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = Int(Elem(operand1, e, esize), unsigned);
+                element2 = Int(Elem(operand2, e, esize), unsigned);
+
+                diff = element1 - element2;
+
+                (Bits _result, bool _sat) = SatQ(diff, esize, unsigned);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // ssubw_advsimd.html
+        public static void Ssubw_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = false;
+            const bool o1 = true;
+
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size == '11' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = 64;
+            int part = (int)UInt(Q);
+            int elements = datasize / esize;
+
+            bool sub_op = (o1 == true);
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(2 * datasize);
+            Bits operand1 = V(2 * datasize, n);
+            Bits operand2 = Vpart(datasize, m, part);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger sum;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = Int(Elem(operand1, e, 2 * esize), unsigned);
+                element2 = Int(Elem(operand2, e, esize), unsigned);
+
+                if (sub_op)
+                {
+                    sum = element1 - element2;
+                }
+                else
+                {
+                    sum = element1 + element2;
+                }
+
+                Elem(result, e, 2 * esize, sum.SubBigInteger(2 * esize - 1, 0));
             }
 
             V(d, result);
@@ -4655,6 +5846,74 @@ namespace Ryujinx.Tests.Cpu.Tester
             Vpart(d, part, result);
         }
 
+        // trn1_advsimd.html
+        public static void Trn1_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool op = false;
+
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+            int part = (int)UInt(op);
+            int pairs = elements / 2;
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+
+            for (int p = 0; p <= pairs - 1; p++)
+            {
+                Elem(result, 2 * p + 0, esize, Elem(operand1, 2 * p + part, esize));
+                Elem(result, 2 * p + 1, esize, Elem(operand2, 2 * p + part, esize));
+            }
+
+            V(d, result);
+        }
+
+        // trn2_advsimd.html
+        public static void Trn2_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool op = true;
+
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+            int part = (int)UInt(op);
+            int pairs = elements / 2;
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+
+            for (int p = 0; p <= pairs - 1; p++)
+            {
+                Elem(result, 2 * p + 0, esize, Elem(operand1, 2 * p + part, esize));
+                Elem(result, 2 * p + 1, esize, Elem(operand2, 2 * p + part, esize));
+            }
+
+            V(d, result);
+        }
+
         // uaba_advsimd.html
         public static void Uaba_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
         {
@@ -4717,8 +5976,8 @@ namespace Ryujinx.Tests.Cpu.Tester
             int part = (int)UInt(Q);
             int elements = datasize / esize;
 
-            bool unsigned = (U == true);
             bool accumulate = (op == false);
+            bool unsigned = (U == true);
 
             /* Operation */
             /* CheckFPAdvSIMDEnabled64(); */
@@ -4806,8 +6065,8 @@ namespace Ryujinx.Tests.Cpu.Tester
             int part = (int)UInt(Q);
             int elements = datasize / esize;
 
-            bool unsigned = (U == true);
             bool accumulate = (op == false);
+            bool unsigned = (U == true);
 
             /* Operation */
             /* CheckFPAdvSIMDEnabled64(); */
@@ -4828,6 +6087,444 @@ namespace Ryujinx.Tests.Cpu.Tester
                 absdiff = Abs(element1 - element2).SubBigInteger(2 * esize - 1, 0);
 
                 Elem(result, e, 2 * esize, Elem(result, e, 2 * esize) + absdiff);
+            }
+
+            V(d, result);
+        }
+
+        // uaddw_advsimd.html
+        public static void Uaddw_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+            const bool o1 = false;
+
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size == '11' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = 64;
+            int part = (int)UInt(Q);
+            int elements = datasize / esize;
+
+            bool sub_op = (o1 == true);
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(2 * datasize);
+            Bits operand1 = V(2 * datasize, n);
+            Bits operand2 = Vpart(datasize, m, part);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger sum;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = Int(Elem(operand1, e, 2 * esize), unsigned);
+                element2 = Int(Elem(operand2, e, esize), unsigned);
+
+                if (sub_op)
+                {
+                    sum = element1 - element2;
+                }
+                else
+                {
+                    sum = element1 + element2;
+                }
+
+                Elem(result, e, 2 * esize, sum.SubBigInteger(2 * esize - 1, 0));
+            }
+
+            V(d, result);
+        }
+
+        // uqadd_advsimd.html#UQADD_asisdsame_only
+        public static void Uqadd_S(Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+
+            /* Decode Scalar */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = esize;
+            int elements = 1;
+
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger sum;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = Int(Elem(operand1, e, esize), unsigned);
+                element2 = Int(Elem(operand2, e, esize), unsigned);
+
+                sum = element1 + element2;
+
+                (Bits _result, bool _sat) = SatQ(sum, esize, unsigned);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // uqadd_advsimd.html#UQADD_asimdsame_only
+        public static void Uqadd_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger sum;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = Int(Elem(operand1, e, esize), unsigned);
+                element2 = Int(Elem(operand2, e, esize), unsigned);
+
+                sum = element1 + element2;
+
+                (Bits _result, bool _sat) = SatQ(sum, esize, unsigned);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // uqsub_advsimd.html#UQSUB_asisdsame_only
+        public static void Uqsub_S(Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+
+            /* Decode Scalar */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = esize;
+            int elements = 1;
+
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger diff;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = Int(Elem(operand1, e, esize), unsigned);
+                element2 = Int(Elem(operand2, e, esize), unsigned);
+
+                diff = element1 - element2;
+
+                (Bits _result, bool _sat) = SatQ(diff, esize, unsigned);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // uqsub_advsimd.html#UQSUB_asimdsame_only
+        public static void Uqsub_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+
+            /* Decode Vector */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger diff;
+            bool sat;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = Int(Elem(operand1, e, esize), unsigned);
+                element2 = Int(Elem(operand2, e, esize), unsigned);
+
+                diff = element1 - element2;
+
+                (Bits _result, bool _sat) = SatQ(diff, esize, unsigned);
+                Elem(result, e, esize, _result);
+                sat = _sat;
+
+                if (sat)
+                {
+                    /* FPSR.QC = '1'; */
+                    FPSR[27] = true; // TODO: Add named fields.
+                }
+            }
+
+            V(d, result);
+        }
+
+        // usubw_advsimd.html
+        public static void Usubw_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool U = true;
+            const bool o1 = true;
+
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size == '11' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = 64;
+            int part = (int)UInt(Q);
+            int elements = datasize / esize;
+
+            bool sub_op = (o1 == true);
+            bool unsigned = (U == true);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(2 * datasize);
+            Bits operand1 = V(2 * datasize, n);
+            Bits operand2 = Vpart(datasize, m, part);
+            BigInteger element1;
+            BigInteger element2;
+            BigInteger sum;
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                element1 = Int(Elem(operand1, e, 2 * esize), unsigned);
+                element2 = Int(Elem(operand2, e, esize), unsigned);
+
+                if (sub_op)
+                {
+                    sum = element1 - element2;
+                }
+                else
+                {
+                    sum = element1 + element2;
+                }
+
+                Elem(result, e, 2 * esize, sum.SubBigInteger(2 * esize - 1, 0));
+            }
+
+            V(d, result);
+        }
+
+        // uzp1_advsimd.html
+        public static void Uzp1_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool op = false;
+
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+            int part = (int)UInt(op);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operandl = V(datasize, n);
+            Bits operandh = V(datasize, m);
+
+            Bits zipped = Bits.Concat(operandh, operandl);
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                Elem(result, e, esize, Elem(zipped, 2 * e + part, esize));
+            }
+
+            V(d, result);
+        }
+
+        // uzp2_advsimd.html
+        public static void Uzp2_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool op = true;
+
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+            int part = (int)UInt(op);
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operandl = V(datasize, n);
+            Bits operandh = V(datasize, m);
+
+            Bits zipped = Bits.Concat(operandh, operandl);
+
+            for (int e = 0; e <= elements - 1; e++)
+            {
+                Elem(result, e, esize, Elem(zipped, 2 * e + part, esize));
+            }
+
+            V(d, result);
+        }
+
+        // zip1_advsimd.html
+        public static void Zip1_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool op = false;
+
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+            int part = (int)UInt(op);
+            int pairs = elements / 2;
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+
+            int @base = part * pairs;
+
+            for (int p = 0; p <= pairs - 1; p++)
+            {
+                Elem(result, 2 * p + 0, esize, Elem(operand1, @base + p, esize));
+                Elem(result, 2 * p + 1, esize, Elem(operand2, @base + p, esize));
+            }
+
+            V(d, result);
+        }
+
+        // zip2_advsimd.html
+        public static void Zip2_V(bool Q, Bits size, Bits Rm, Bits Rn, Bits Rd)
+        {
+            const bool op = true;
+
+            /* Decode */
+            int d = (int)UInt(Rd);
+            int n = (int)UInt(Rn);
+            int m = (int)UInt(Rm);
+
+            /* if size:Q == '110' then ReservedValue(); */
+
+            int esize = 8 << (int)UInt(size);
+            int datasize = (Q ? 128 : 64);
+            int elements = datasize / esize;
+            int part = (int)UInt(op);
+            int pairs = elements / 2;
+
+            /* Operation */
+            /* CheckFPAdvSIMDEnabled64(); */
+
+            Bits result = new Bits(datasize);
+            Bits operand1 = V(datasize, n);
+            Bits operand2 = V(datasize, m);
+
+            int @base = part * pairs;
+
+            for (int p = 0; p <= pairs - 1; p++)
+            {
+                Elem(result, 2 * p + 0, esize, Elem(operand1, @base + p, esize));
+                Elem(result, 2 * p + 1, esize, Elem(operand2, @base + p, esize));
             }
 
             V(d, result);

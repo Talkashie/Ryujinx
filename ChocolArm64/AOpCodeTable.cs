@@ -4,6 +4,7 @@ using ChocolArm64.Instruction;
 using ChocolArm64.Instruction32;
 using ChocolArm64.State;
 using System;
+using System.Collections.Generic;
 
 namespace ChocolArm64
 {
@@ -44,7 +45,7 @@ namespace ChocolArm64
             SetA64("11101010xx0xxxxxxxxxxxxxxxxxxxxx", AInstEmit.Ands,          typeof(AOpCodeAluRs));
             SetA64("x0011010110xxxxx001010xxxxxxxxxx", AInstEmit.Asrv,          typeof(AOpCodeAluRs));
             SetA64("000101xxxxxxxxxxxxxxxxxxxxxxxxxx", AInstEmit.B,             typeof(AOpCodeBImmAl));
-            SetA64("01010100xxxxxxxxxxxxxxxxxxxxxxxx", AInstEmit.B_Cond,        typeof(AOpCodeBImmCond));
+            SetA64("01010100xxxxxxxxxxxxxxxxxxx0xxxx", AInstEmit.B_Cond,        typeof(AOpCodeBImmCond));
             SetA64("00110011000xxxxx0xxxxxxxxxxxxxxx", AInstEmit.Bfm,           typeof(AOpCodeBfm));
             SetA64("1011001101xxxxxxxxxxxxxxxxxxxxxx", AInstEmit.Bfm,           typeof(AOpCodeBfm));
             SetA64("00001010xx1xxxxx0xxxxxxxxxxxxxxx", AInstEmit.Bic,           typeof(AOpCodeAluRs));
@@ -52,8 +53,8 @@ namespace ChocolArm64
             SetA64("01101010xx1xxxxx0xxxxxxxxxxxxxxx", AInstEmit.Bics,          typeof(AOpCodeAluRs));
             SetA64("11101010xx1xxxxxxxxxxxxxxxxxxxxx", AInstEmit.Bics,          typeof(AOpCodeAluRs));
             SetA64("100101xxxxxxxxxxxxxxxxxxxxxxxxxx", AInstEmit.Bl,            typeof(AOpCodeBImmAl));
-            SetA64("11010110001xxxxx000000xxxxxxxxxx", AInstEmit.Blr,           typeof(AOpCodeBReg));
-            SetA64("11010110000xxxxx000000xxxxxxxxxx", AInstEmit.Br,            typeof(AOpCodeBReg));
+            SetA64("1101011000111111000000xxxxx00000", AInstEmit.Blr,           typeof(AOpCodeBReg));
+            SetA64("1101011000011111000000xxxxx00000", AInstEmit.Br,            typeof(AOpCodeBReg));
             SetA64("11010100001xxxxxxxxxxxxxxxx00000", AInstEmit.Brk,           typeof(AOpCodeException));
             SetA64("x0110101xxxxxxxxxxxxxxxxxxxxxxxx", AInstEmit.Cbnz,          typeof(AOpCodeBImmCmp));
             SetA64("x0110100xxxxxxxxxxxxxxxxxxxxxxxx", AInstEmit.Cbz,           typeof(AOpCodeBImmCmp));
@@ -126,7 +127,7 @@ namespace ChocolArm64
             SetA64("11111000100xxxxxxxxx00xxxxxxxxxx", AInstEmit.Pfrm,          typeof(AOpCodeMemImm));
             SetA64("11011000xxxxxxxxxxxxxxxxxxxxxxxx", AInstEmit.Pfrm,          typeof(AOpCodeMemLit));
             SetA64("x101101011000000000000xxxxxxxxxx", AInstEmit.Rbit,          typeof(AOpCodeAlu));
-            SetA64("11010110010xxxxx000000xxxxxxxxxx", AInstEmit.Ret,           typeof(AOpCodeBReg));
+            SetA64("1101011001011111000000xxxxx00000", AInstEmit.Ret,           typeof(AOpCodeBReg));
             SetA64("x101101011000000000001xxxxxxxxxx", AInstEmit.Rev16,         typeof(AOpCodeAlu));
             SetA64("x101101011000000000010xxxxxxxxxx", AInstEmit.Rev32,         typeof(AOpCodeAlu));
             SetA64("1101101011000000000011xxxxxxxxxx", AInstEmit.Rev64,         typeof(AOpCodeAlu));
@@ -179,6 +180,10 @@ namespace ChocolArm64
             SetA64("0>001110<<1xxxxx101111xxxxxxxxxx", AInstEmit.Addp_V,        typeof(AOpCodeSimdReg));
             SetA64("000011100x110001101110xxxxxxxxxx", AInstEmit.Addv_V,        typeof(AOpCodeSimd));
             SetA64("01001110<<110001101110xxxxxxxxxx", AInstEmit.Addv_V,        typeof(AOpCodeSimd));
+            SetA64("0100111000101000010110xxxxxxxxxx", AInstEmit.Aesd_V,        typeof(AOpCodeSimd));
+            SetA64("0100111000101000010010xxxxxxxxxx", AInstEmit.Aese_V,        typeof(AOpCodeSimd));
+            SetA64("0100111000101000011110xxxxxxxxxx", AInstEmit.Aesimc_V,      typeof(AOpCodeSimd));
+            SetA64("0100111000101000011010xxxxxxxxxx", AInstEmit.Aesmc_V,       typeof(AOpCodeSimd));
             SetA64("0x001110001xxxxx000111xxxxxxxxxx", AInstEmit.And_V,         typeof(AOpCodeSimdReg));
             SetA64("0x001110011xxxxx000111xxxxxxxxxx", AInstEmit.Bic_V,         typeof(AOpCodeSimdReg));
             SetA64("0x10111100000xxx<<x101xxxxxxxxxx", AInstEmit.Bic_Vi,        typeof(AOpCodeSimdImm));
@@ -266,11 +271,13 @@ namespace ChocolArm64
             SetA64("0>1011100<1xxxxx111111xxxxxxxxxx", AInstEmit.Fdiv_V,        typeof(AOpCodeSimdReg));
             SetA64("000111110x0xxxxx0xxxxxxxxxxxxxxx", AInstEmit.Fmadd_S,       typeof(AOpCodeSimdReg));
             SetA64("000111100x1xxxxx010010xxxxxxxxxx", AInstEmit.Fmax_S,        typeof(AOpCodeSimdReg));
-            SetA64("0x0011100x1xxxxx111101xxxxxxxxxx", AInstEmit.Fmax_V,        typeof(AOpCodeSimdReg));
+            SetA64("0>0011100<1xxxxx111101xxxxxxxxxx", AInstEmit.Fmax_V,        typeof(AOpCodeSimdReg));
             SetA64("000111100x1xxxxx011010xxxxxxxxxx", AInstEmit.Fmaxnm_S,      typeof(AOpCodeSimdReg));
+            SetA64("0>0011100<1xxxxx110001xxxxxxxxxx", AInstEmit.Fmaxnm_V,      typeof(AOpCodeSimdReg));
             SetA64("000111100x1xxxxx010110xxxxxxxxxx", AInstEmit.Fmin_S,        typeof(AOpCodeSimdReg));
-            SetA64("0x0011101x1xxxxx111101xxxxxxxxxx", AInstEmit.Fmin_V,        typeof(AOpCodeSimdReg));
+            SetA64("0>0011101<1xxxxx111101xxxxxxxxxx", AInstEmit.Fmin_V,        typeof(AOpCodeSimdReg));
             SetA64("000111100x1xxxxx011110xxxxxxxxxx", AInstEmit.Fminnm_S,      typeof(AOpCodeSimdReg));
+            SetA64("0>0011101<1xxxxx110001xxxxxxxxxx", AInstEmit.Fminnm_V,      typeof(AOpCodeSimdReg));
             SetA64("010111111<<xxxxx0001x0xxxxxxxxxx", AInstEmit.Fmla_Se,       typeof(AOpCodeSimdRegElemF));
             SetA64("0>0011100<1xxxxx110011xxxxxxxxxx", AInstEmit.Fmla_V,        typeof(AOpCodeSimdReg));
             SetA64("0x0011111<<xxxxx0001x0xxxxxxxxxx", AInstEmit.Fmla_Ve,       typeof(AOpCodeSimdRegElemF));
@@ -357,10 +364,16 @@ namespace ChocolArm64
             SetA64("0x001110<<1xxxxx010100xxxxxxxxxx", AInstEmit.Sabal_V,       typeof(AOpCodeSimdReg));
             SetA64("0x001110<<1xxxxx011101xxxxxxxxxx", AInstEmit.Sabd_V,        typeof(AOpCodeSimdReg));
             SetA64("0x001110<<1xxxxx011100xxxxxxxxxx", AInstEmit.Sabdl_V,       typeof(AOpCodeSimdReg));
+            SetA64("0x001110<<100000011010xxxxxxxxxx", AInstEmit.Sadalp_V,      typeof(AOpCodeSimd));
+            SetA64("0x001110<<100000001010xxxxxxxxxx", AInstEmit.Saddlp_V,      typeof(AOpCodeSimd));
             SetA64("0x001110<<1xxxxx000100xxxxxxxxxx", AInstEmit.Saddw_V,       typeof(AOpCodeSimdReg));
             SetA64("x0011110xx100010000000xxxxxxxxxx", AInstEmit.Scvtf_Gp,      typeof(AOpCodeSimdCvt));
             SetA64("010111100x100001110110xxxxxxxxxx", AInstEmit.Scvtf_S,       typeof(AOpCodeSimd));
             SetA64("0x0011100x100001110110xxxxxxxxxx", AInstEmit.Scvtf_V,       typeof(AOpCodeSimd));
+            SetA64("01011110000xxxxx010000xxxxxxxxxx", AInstEmit.Sha256h_V,     typeof(AOpCodeSimdReg));
+            SetA64("01011110000xxxxx010100xxxxxxxxxx", AInstEmit.Sha256h2_V,    typeof(AOpCodeSimdReg));
+            SetA64("0101111000101000001010xxxxxxxxxx", AInstEmit.Sha256su0_V,   typeof(AOpCodeSimd));
+            SetA64("01011110000xxxxx011000xxxxxxxxxx", AInstEmit.Sha256su1_V,   typeof(AOpCodeSimdReg));
             SetA64("010111110>>>>xxx010101xxxxxxxxxx", AInstEmit.Shl_S,         typeof(AOpCodeSimdShImm));
             SetA64("0x0011110>>>>xxx010101xxxxxxxxxx", AInstEmit.Shl_V,         typeof(AOpCodeSimdShImm));
             SetA64("0x101110<<100001001110xxxxxxxxxx", AInstEmit.Shll_V,        typeof(AOpCodeSimd));
@@ -371,16 +384,39 @@ namespace ChocolArm64
             SetA64("0x001110<<1xxxxx011011xxxxxxxxxx", AInstEmit.Smin_V,        typeof(AOpCodeSimdReg));
             SetA64("0x001110<<1xxxxx101011xxxxxxxxxx", AInstEmit.Sminp_V,       typeof(AOpCodeSimdReg));
             SetA64("0x001110<<1xxxxx100000xxxxxxxxxx", AInstEmit.Smlal_V,       typeof(AOpCodeSimdReg));
+            SetA64("0x001110<<1xxxxx101000xxxxxxxxxx", AInstEmit.Smlsl_V,       typeof(AOpCodeSimdReg));
             SetA64("0x001110<<1xxxxx110000xxxxxxxxxx", AInstEmit.Smull_V,       typeof(AOpCodeSimdReg));
+            SetA64("01011110xx100000011110xxxxxxxxxx", AInstEmit.Sqabs_S,       typeof(AOpCodeSimd));
+            SetA64("0>001110<<100000011110xxxxxxxxxx", AInstEmit.Sqabs_V,       typeof(AOpCodeSimd));
+            SetA64("01011110xx1xxxxx000011xxxxxxxxxx", AInstEmit.Sqadd_S,       typeof(AOpCodeSimdReg));
+            SetA64("0>001110<<1xxxxx000011xxxxxxxxxx", AInstEmit.Sqadd_V,       typeof(AOpCodeSimdReg));
+            SetA64("01011110011xxxxx101101xxxxxxxxxx", AInstEmit.Sqdmulh_S,     typeof(AOpCodeSimdReg));
+            SetA64("01011110101xxxxx101101xxxxxxxxxx", AInstEmit.Sqdmulh_S,     typeof(AOpCodeSimdReg));
+            SetA64("0x001110011xxxxx101101xxxxxxxxxx", AInstEmit.Sqdmulh_V,     typeof(AOpCodeSimdReg));
+            SetA64("0x001110101xxxxx101101xxxxxxxxxx", AInstEmit.Sqdmulh_V,     typeof(AOpCodeSimdReg));
+            SetA64("01111110xx100000011110xxxxxxxxxx", AInstEmit.Sqneg_S,       typeof(AOpCodeSimd));
+            SetA64("0>101110<<100000011110xxxxxxxxxx", AInstEmit.Sqneg_V,       typeof(AOpCodeSimd));
+            SetA64("01111110011xxxxx101101xxxxxxxxxx", AInstEmit.Sqrdmulh_S,    typeof(AOpCodeSimdReg));
+            SetA64("01111110101xxxxx101101xxxxxxxxxx", AInstEmit.Sqrdmulh_S,    typeof(AOpCodeSimdReg));
+            SetA64("0x101110011xxxxx101101xxxxxxxxxx", AInstEmit.Sqrdmulh_V,    typeof(AOpCodeSimdReg));
+            SetA64("0x101110101xxxxx101101xxxxxxxxxx", AInstEmit.Sqrdmulh_V,    typeof(AOpCodeSimdReg));
+            SetA64("0x00111100>>>xxx100111xxxxxxxxxx", AInstEmit.Sqrshrn_V,     typeof(AOpCodeSimdShImm));
+            SetA64("01011110xx1xxxxx001011xxxxxxxxxx", AInstEmit.Sqsub_S,       typeof(AOpCodeSimdReg));
+            SetA64("0>001110<<1xxxxx001011xxxxxxxxxx", AInstEmit.Sqsub_V,       typeof(AOpCodeSimdReg));
             SetA64("01011110<<100001010010xxxxxxxxxx", AInstEmit.Sqxtn_S,       typeof(AOpCodeSimd));
             SetA64("0x001110<<100001010010xxxxxxxxxx", AInstEmit.Sqxtn_V,       typeof(AOpCodeSimd));
             SetA64("01111110<<100001001010xxxxxxxxxx", AInstEmit.Sqxtun_S,      typeof(AOpCodeSimd));
             SetA64("0x101110<<100001001010xxxxxxxxxx", AInstEmit.Sqxtun_V,      typeof(AOpCodeSimd));
+            SetA64("0x00111100>>>xxx001001xxxxxxxxxx", AInstEmit.Srshr_V,       typeof(AOpCodeSimdShImm));
+            SetA64("0100111101xxxxxx001001xxxxxxxxxx", AInstEmit.Srshr_V,       typeof(AOpCodeSimdShImm));
             SetA64("0>001110<<1xxxxx010001xxxxxxxxxx", AInstEmit.Sshl_V,        typeof(AOpCodeSimdReg));
             SetA64("0x00111100>>>xxx101001xxxxxxxxxx", AInstEmit.Sshll_V,       typeof(AOpCodeSimdShImm));
-            SetA64("010111110>>>>xxx000001xxxxxxxxxx", AInstEmit.Sshr_S,        typeof(AOpCodeSimdShImm));
-            SetA64("0x0011110>>>>xxx000001xxxxxxxxxx", AInstEmit.Sshr_V,        typeof(AOpCodeSimdShImm));
-            SetA64("0x0011110>>>>xxx000101xxxxxxxxxx", AInstEmit.Ssra_V,        typeof(AOpCodeSimdShImm));
+            SetA64("0101111101xxxxxx000001xxxxxxxxxx", AInstEmit.Sshr_S,        typeof(AOpCodeSimdShImm));
+            SetA64("0x00111100>>>xxx000001xxxxxxxxxx", AInstEmit.Sshr_V,        typeof(AOpCodeSimdShImm));
+            SetA64("0100111101xxxxxx000001xxxxxxxxxx", AInstEmit.Sshr_V,        typeof(AOpCodeSimdShImm));
+            SetA64("0x00111100>>>xxx000101xxxxxxxxxx", AInstEmit.Ssra_V,        typeof(AOpCodeSimdShImm));
+            SetA64("0100111101xxxxxx000101xxxxxxxxxx", AInstEmit.Ssra_V,        typeof(AOpCodeSimdShImm));
+            SetA64("0x001110<<1xxxxx001100xxxxxxxxxx", AInstEmit.Ssubw_V,       typeof(AOpCodeSimdReg));
             SetA64("0x00110000000000xxxxxxxxxxxxxxxx", AInstEmit.St__Vms,       typeof(AOpCodeSimdMemMs));
             SetA64("0x001100100xxxxxxxxxxxxxxxxxxxxx", AInstEmit.St__Vms,       typeof(AOpCodeSimdMemMs));
             SetA64("0x00110100x00000xxxxxxxxxxxxxxxx", AInstEmit.St__Vss,       typeof(AOpCodeSimdMemSs));
@@ -394,6 +430,8 @@ namespace ChocolArm64
             SetA64("01111110111xxxxx100001xxxxxxxxxx", AInstEmit.Sub_S,         typeof(AOpCodeSimdReg));
             SetA64("0>101110<<1xxxxx100001xxxxxxxxxx", AInstEmit.Sub_V,         typeof(AOpCodeSimdReg));
             SetA64("0x001110<<1xxxxx011000xxxxxxxxxx", AInstEmit.Subhn_V,       typeof(AOpCodeSimdReg));
+            SetA64("01011110xx100000001110xxxxxxxxxx", AInstEmit.Suqadd_S,      typeof(AOpCodeSimd));
+            SetA64("0>001110<<100000001110xxxxxxxxxx", AInstEmit.Suqadd_V,      typeof(AOpCodeSimd));
             SetA64("0x001110000xxxxx0xx000xxxxxxxxxx", AInstEmit.Tbl_V,         typeof(AOpCodeSimdTbl));
             SetA64("0>001110<<0xxxxx001010xxxxxxxxxx", AInstEmit.Trn1_V,        typeof(AOpCodeSimdReg));
             SetA64("0>001110<<0xxxxx011010xxxxxxxxxx", AInstEmit.Trn2_V,        typeof(AOpCodeSimdReg));
@@ -401,7 +439,9 @@ namespace ChocolArm64
             SetA64("0x101110<<1xxxxx010100xxxxxxxxxx", AInstEmit.Uabal_V,       typeof(AOpCodeSimdReg));
             SetA64("0x101110<<1xxxxx011101xxxxxxxxxx", AInstEmit.Uabd_V,        typeof(AOpCodeSimdReg));
             SetA64("0x101110<<1xxxxx011100xxxxxxxxxx", AInstEmit.Uabdl_V,       typeof(AOpCodeSimdReg));
+            SetA64("0x101110<<100000011010xxxxxxxxxx", AInstEmit.Uadalp_V,      typeof(AOpCodeSimd));
             SetA64("0x101110<<1xxxxx000000xxxxxxxxxx", AInstEmit.Uaddl_V,       typeof(AOpCodeSimdReg));
+            SetA64("0x101110<<100000001010xxxxxxxxxx", AInstEmit.Uaddlp_V,      typeof(AOpCodeSimd));
             SetA64("001011100x110000001110xxxxxxxxxx", AInstEmit.Uaddlv_V,      typeof(AOpCodeSimd));
             SetA64("01101110<<110000001110xxxxxxxxxx", AInstEmit.Uaddlv_V,      typeof(AOpCodeSimd));
             SetA64("0x101110<<1xxxxx000100xxxxxxxxxx", AInstEmit.Uaddw_V,       typeof(AOpCodeSimdReg));
@@ -415,31 +455,65 @@ namespace ChocolArm64
             SetA64("0x101110<<1xxxxx101011xxxxxxxxxx", AInstEmit.Uminp_V,       typeof(AOpCodeSimdReg));
             SetA64("0x001110000xxxxx001111xxxxxxxxxx", AInstEmit.Umov_S,        typeof(AOpCodeSimdIns));
             SetA64("0x101110<<1xxxxx110000xxxxxxxxxx", AInstEmit.Umull_V,       typeof(AOpCodeSimdReg));
+            SetA64("01111110xx1xxxxx000011xxxxxxxxxx", AInstEmit.Uqadd_S,       typeof(AOpCodeSimdReg));
+            SetA64("0>101110<<1xxxxx000011xxxxxxxxxx", AInstEmit.Uqadd_V,       typeof(AOpCodeSimdReg));
+            SetA64("01111110xx1xxxxx001011xxxxxxxxxx", AInstEmit.Uqsub_S,       typeof(AOpCodeSimdReg));
+            SetA64("0>101110<<1xxxxx001011xxxxxxxxxx", AInstEmit.Uqsub_V,       typeof(AOpCodeSimdReg));
             SetA64("01111110<<100001010010xxxxxxxxxx", AInstEmit.Uqxtn_S,       typeof(AOpCodeSimd));
             SetA64("0x101110<<100001010010xxxxxxxxxx", AInstEmit.Uqxtn_V,       typeof(AOpCodeSimd));
             SetA64("0>101110<<1xxxxx010001xxxxxxxxxx", AInstEmit.Ushl_V,        typeof(AOpCodeSimdReg));
             SetA64("0x10111100>>>xxx101001xxxxxxxxxx", AInstEmit.Ushll_V,       typeof(AOpCodeSimdShImm));
-            SetA64("011111110>>>>xxx000001xxxxxxxxxx", AInstEmit.Ushr_S,        typeof(AOpCodeSimdShImm));
-            SetA64("0x1011110>>>>xxx000001xxxxxxxxxx", AInstEmit.Ushr_V,        typeof(AOpCodeSimdShImm));
-            SetA64("0x1011110>>>>xxx000101xxxxxxxxxx", AInstEmit.Usra_V,        typeof(AOpCodeSimdShImm));
+            SetA64("0111111101xxxxxx000001xxxxxxxxxx", AInstEmit.Ushr_S,        typeof(AOpCodeSimdShImm));
+            SetA64("0x10111100>>>xxx000001xxxxxxxxxx", AInstEmit.Ushr_V,        typeof(AOpCodeSimdShImm));
+            SetA64("0110111101xxxxxx000001xxxxxxxxxx", AInstEmit.Ushr_V,        typeof(AOpCodeSimdShImm));
+            SetA64("01111110xx100000001110xxxxxxxxxx", AInstEmit.Usqadd_S,      typeof(AOpCodeSimd));
+            SetA64("0>101110<<100000001110xxxxxxxxxx", AInstEmit.Usqadd_V,      typeof(AOpCodeSimd));
+            SetA64("0x10111100>>>xxx000101xxxxxxxxxx", AInstEmit.Usra_V,        typeof(AOpCodeSimdShImm));
+            SetA64("0110111101xxxxxx000101xxxxxxxxxx", AInstEmit.Usra_V,        typeof(AOpCodeSimdShImm));
+            SetA64("0x101110<<1xxxxx001100xxxxxxxxxx", AInstEmit.Usubw_V,       typeof(AOpCodeSimdReg));
             SetA64("0>001110<<0xxxxx000110xxxxxxxxxx", AInstEmit.Uzp1_V,        typeof(AOpCodeSimdReg));
             SetA64("0>001110<<0xxxxx010110xxxxxxxxxx", AInstEmit.Uzp2_V,        typeof(AOpCodeSimdReg));
             SetA64("0x001110<<100001001010xxxxxxxxxx", AInstEmit.Xtn_V,         typeof(AOpCodeSimd));
             SetA64("0>001110<<0xxxxx001110xxxxxxxxxx", AInstEmit.Zip1_V,        typeof(AOpCodeSimdReg));
             SetA64("0>001110<<0xxxxx011110xxxxxxxxxx", AInstEmit.Zip2_V,        typeof(AOpCodeSimdReg));
 #endregion
+
+#region "Generate InstA64FastLookup Table (AArch64)"
+            var Tmp = new List<InstInfo>[FastLookupSize];
+            for (int i = 0; i < FastLookupSize; i++)
+            {
+                Tmp[i] = new List<InstInfo>();
+            }
+
+            foreach (var Inst in AllInstA64)
+            {
+                int Mask = ToFastLookupIndex(Inst.Mask);
+                int Value = ToFastLookupIndex(Inst.Value);
+
+                for (int i = 0; i < FastLookupSize; i++)
+                {
+                    if ((i & Mask) == Value)
+                    {
+                        Tmp[i].Add(Inst);
+                    }
+                }
+            }
+
+            for (int i = 0; i < FastLookupSize; i++)
+            {
+                InstA64FastLookup[i] = Tmp[i].ToArray();
+            }
+#endregion
         }
 
-        private class TreeNode
+        private class InstInfo
         {
             public int Mask;
             public int Value;
 
-            public TreeNode Next;
-
             public AInst Inst;
 
-            public TreeNode(int Mask, int Value, AInst Inst)
+            public InstInfo(int Mask, int Value, AInst Inst)
             {
                 this.Mask  = Mask;
                 this.Value = Value;
@@ -447,8 +521,11 @@ namespace ChocolArm64
             }
         }
 
-        private static TreeNode InstHeadA32;
-        private static TreeNode InstHeadA64;
+        private static List<InstInfo> AllInstA32 = new List<InstInfo>();
+        private static List<InstInfo> AllInstA64 = new List<InstInfo>();
+
+        private static int FastLookupSize = 0x1000;
+        private static InstInfo[][] InstA64FastLookup = new InstInfo[FastLookupSize][];
 
         private static void SetA32(string Encoding, AInstInterpreter Interpreter, Type Type)
         {
@@ -509,7 +586,7 @@ namespace ChocolArm64
 
             if (XBits == 0)
             {
-                InsertTop(XMask, Value, Inst, Mode);
+                InsertInst(XMask, Value, Inst, Mode);
 
                 return;
             }
@@ -525,55 +602,53 @@ namespace ChocolArm64
 
                 if (Mask != Blacklisted)
                 {
-                    InsertTop(XMask, Value | Mask, Inst, Mode);
+                    InsertInst(XMask, Value | Mask, Inst, Mode);
                 }
             }
         }
 
-        private static void InsertTop(
+        private static void InsertInst(
             int            XMask,
             int            Value,
             AInst          Inst,
             AExecutionMode Mode)
         {
-            TreeNode Node = new TreeNode(XMask, Value, Inst);
+            InstInfo Info = new InstInfo(XMask, Value, Inst);
 
             if (Mode == AExecutionMode.AArch64)
             {
-                Node.Next = InstHeadA64;
-
-                InstHeadA64 = Node;
+                AllInstA64.Add(Info);
             }
             else
             {
-                Node.Next = InstHeadA32;
-
-                InstHeadA32 = Node;
+                AllInstA32.Add(Info);
             }
         }
 
         public static AInst GetInstA32(int OpCode)
         {
-            return GetInst(InstHeadA32, OpCode);
+            return GetInstFromList(AllInstA32, OpCode);
         }
 
         public static AInst GetInstA64(int OpCode)
         {
-            return GetInst(InstHeadA64, OpCode);
+            return GetInstFromList(InstA64FastLookup[ToFastLookupIndex(OpCode)], OpCode);
         }
 
-        private static AInst GetInst(TreeNode Head, int OpCode)
+        private static int ToFastLookupIndex(int Value)
         {
-            TreeNode Node = Head;
+            return ((Value >> 10) & 0x00F) | ((Value >> 18) & 0xFF0);
+        }
 
-            do
+        private static AInst GetInstFromList(IEnumerable<InstInfo> InstList, int OpCode)
+        {
+            foreach (var Node in InstList)
             {
                 if ((OpCode & Node.Mask) == Node.Value)
                 {
                     return Node.Inst;
                 }
             }
-            while ((Node = Node.Next) != null);
 
             return AInst.Undefined;
         }

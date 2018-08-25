@@ -5,7 +5,7 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 {
     public class OGLRenderer : IGalRenderer
     {
-        public IGalBlend Blend { get; private set; }
+        public IGalConstBuffer Buffer { get; private set; }
 
         public IGalFrameBuffer FrameBuffer { get; private set; }
 
@@ -13,21 +13,25 @@ namespace Ryujinx.Graphics.Gal.OpenGL
 
         public IGalShader Shader { get; private set; }
 
+        public IGalPipeline Pipeline { get; private set; }
+
         public IGalTexture Texture { get; private set; }
 
         private ConcurrentQueue<Action> ActionsQueue;
 
         public OGLRenderer()
         {
-            Blend = new OGLBlend();
+            Buffer = new OGLConstBuffer();
 
-            FrameBuffer = new OGLFrameBuffer();
+            Texture = new OGLTexture();
+
+            FrameBuffer = new OGLFrameBuffer(Texture as OGLTexture);
 
             Rasterizer = new OGLRasterizer();
 
-            Shader = new OGLShader();
+            Shader = new OGLShader(Buffer as OGLConstBuffer);
 
-            Texture = new OGLTexture();
+            Pipeline = new OGLPipeline(Buffer as OGLConstBuffer, Rasterizer as OGLRasterizer, Shader as OGLShader);
 
             ActionsQueue = new ConcurrentQueue<Action>();
         }

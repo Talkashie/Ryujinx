@@ -25,6 +25,10 @@ namespace Ryujinx.HLE.Gpu.Engines
 
         private HashSet<long> FrameBuffers;
 
+        private List<long>[] UploadedKeys;
+
+        private int CurrentInstance = 0;
+
         public NvGpuEngine3d(NvGpu Gpu)
         {
             this.Gpu = Gpu;
@@ -57,6 +61,13 @@ namespace Ryujinx.HLE.Gpu.Engines
             }
 
             FrameBuffers = new HashSet<long>();
+
+            UploadedKeys = new List<long>[(int)NvGpuBufferType.Count];
+
+            for (int i = 0; i < UploadedKeys.Length; i++)
+            {
+                UploadedKeys[i] = new List<long>();
+            }
         }
 
         public void CallMethod(NvGpuVmm Vmm, NvGpuPBEntry PBEntry)
@@ -71,39 +82,60 @@ namespace Ryujinx.HLE.Gpu.Engines
             }
         }
 
+        public void ResetCache()
+        {
+            foreach (List<long> Uploaded in UploadedKeys)
+            {
+                Uploaded.Clear();
+            }
+        }
+
         private void VertexEndGl(NvGpuVmm Vmm, NvGpuPBEntry PBEntry)
         {
             LockCaches();
 
-            SetFrameBuffer(Vmm, 0);
+            GalPipelineState State = new GalPipelineState();
+
+            SetFlip(State);
+            SetFrontFace(State);
+            SetCullFace(State);
+            SetDepth(State);
+            SetStencil(State);
+            SetAlphaBlending(State);
+            SetPrimitiveRestart(State);
+
+            for (int FbIndex = 0; FbIndex < 8; FbIndex++)
+            {
+                SetFrameBuffer(Vmm, 0);
+            }
+            
+            SetZeta(Vmm);
+
+            SetRenderTargets();
 
             long[] Keys = UploadShaders(Vmm);
 
             Gpu.Renderer.Shader.BindProgram();
 
-            //Note: Uncomment SetFrontFace SetCullFace when flipping issues are solved
-            //SetFrontFace();
-            //SetCullFace();
-            SetDepth();
-            SetStencil();
-            SetAlphaBlending();
-            SetPrimitiveRestart();
+            UploadTextures(Vmm, State, Keys);
+            UploadConstBuffers(Vmm, State, Keys);
+            UploadVertexArrays(Vmm, State);
 
-            UploadTextures(Vmm, Keys);
-            UploadUniforms(Vmm);
-            UploadVertexArrays(Vmm);
+            DispatchRender(Vmm, State);
 
             UnlockCaches();
         }
 
         private void LockCaches()
         {
+            Gpu.Renderer.Buffer.LockCache();
             Gpu.Renderer.Rasterizer.LockCaches();
             Gpu.Renderer.Texture.LockCache();
         }
 
         private void UnlockCaches()
         {
+            Gpu.Renderer.Buffer.UnlockCache();
             Gpu.Renderer.Rasterizer.UnlockCaches();
             Gpu.Renderer.Texture.UnlockCache();
         }
@@ -116,14 +148,38 @@ namespace Ryujinx.HLE.Gpu.Engines
 
             GalClearBufferFlags Flags = (GalClearBufferFlags)(Arg0 & 0x3f);
 
-            SetFrameBuffer(Vmm, FbIndex);
+            float Red   = ReadRegisterFloat(NvGpuEngine3dReg.ClearNColor + 0);
+            float Green = ReadRegisterFloat(NvGpuEngine3dReg.ClearNColor + 1);
+            float Blue  = ReadRegisterFloat(NvGpuEngine3dReg.ClearNColor + 2);
+            float Alpha = ReadRegisterFloat(NvGpuEngine3dReg.ClearNColor + 3);
 
-            Gpu.Renderer.Rasterizer.ClearBuffers(Flags);
+            float Depth = ReadRegisterFloat(NvGpuEngine3dReg.ClearDepth);
+
+            int Stencil = ReadRegister(NvGpuEngine3dReg.ClearStencil);
+
+            SetFrameBuffer(Vmm, FbIndex);
+            SetZeta(Vmm);
+
+            Gpu.Renderer.Rasterizer.ClearBuffers(
+                Flags,
+                FbIndex,
+                Red, Green, Blue, Alpha,
+                Depth,
+                Stencil);
         }
 
         private void SetFrameBuffer(NvGpuVmm Vmm, int FbIndex)
         {
             long VA = MakeInt64From2xInt32(NvGpuEngine3dReg.FrameBufferNAddress + FbIndex * 0x10);
+
+            int Format = ReadRegister(NvGpuEngine3dReg.FrameBufferNFormat + FbIndex * 0x10);
+
+            if (VA == 0 || Format == 0)
+            {
+                Gpu.Renderer.FrameBuffer.UnbindColor(FbIndex);
+
+                return;
+            }
 
             long Key = Vmm.GetPhysicalAddress(VA);
 
@@ -132,10 +188,58 @@ namespace Ryujinx.HLE.Gpu.Engines
             int Width  = ReadRegister(NvGpuEngine3dReg.FrameBufferNWidth  + FbIndex * 0x10);
             int Height = ReadRegister(NvGpuEngine3dReg.FrameBufferNHeight + FbIndex * 0x10);
 
-            //Note: Using the Width/Height results seems to give incorrect results.
-            //Maybe the size of all frame buffers is hardcoded to screen size? This seems unlikely.
-            Gpu.Renderer.FrameBuffer.Create(Key, 1280, 720);
-            Gpu.Renderer.FrameBuffer.Bind(Key);
+            float TX = ReadRegisterFloat(NvGpuEngine3dReg.ViewportNTranslateX + FbIndex * 8);
+            float TY = ReadRegisterFloat(NvGpuEngine3dReg.ViewportNTranslateY + FbIndex * 8);
+
+            float SX = ReadRegisterFloat(NvGpuEngine3dReg.ViewportNScaleX + FbIndex * 8);
+            float SY = ReadRegisterFloat(NvGpuEngine3dReg.ViewportNScaleY + FbIndex * 8);
+
+            int VpX = (int)MathF.Max(0, TX - MathF.Abs(SX));
+            int VpY = (int)MathF.Max(0, TY - MathF.Abs(SY));
+
+            int VpW = (int)(TX + MathF.Abs(SX)) - VpX;
+            int VpH = (int)(TY + MathF.Abs(SY)) - VpY;
+
+            GalImageFormat ImageFormat = ImageFormatConverter.ConvertFrameBuffer((GalFrameBufferFormat)Format);
+
+            GalImage Image = new GalImage(Width, Height, ImageFormat);
+
+            long Size = TextureHelper.GetTextureSize(Image);
+
+            Gpu.Renderer.Texture.CreateFb(Key, Size, Image);
+            Gpu.Renderer.FrameBuffer.BindColor(Key, FbIndex);
+
+            Gpu.Renderer.FrameBuffer.SetViewport(VpX, VpY, VpW, VpH);
+        }
+
+        private void SetZeta(NvGpuVmm Vmm)
+        {
+            long ZA = MakeInt64From2xInt32(NvGpuEngine3dReg.ZetaAddress);
+
+            int Format = ReadRegister(NvGpuEngine3dReg.ZetaFormat);
+
+            bool ZetaEnable = (ReadRegister(NvGpuEngine3dReg.ZetaEnable) & 1) != 0;
+
+            if (ZA == 0 || Format == 0 || !ZetaEnable)
+            {
+                Gpu.Renderer.FrameBuffer.UnbindZeta();
+
+                return;
+            }
+
+            long Key = Vmm.GetPhysicalAddress(ZA);
+            
+            int Width  = ReadRegister(NvGpuEngine3dReg.ZetaHoriz);
+            int Height = ReadRegister(NvGpuEngine3dReg.ZetaVert);
+
+            GalImageFormat ImageFormat = ImageFormatConverter.ConvertZeta((GalZetaFormat)Format);
+
+            GalImage Image = new GalImage(Width, Height, ImageFormat);
+
+            long Size = TextureHelper.GetTextureSize(Image);
+
+            Gpu.Renderer.Texture.CreateFb(Key, Size, Image);
+            Gpu.Renderer.FrameBuffer.BindZeta(Key);
         }
 
         private long[] UploadShaders(NvGpuVmm Vmm)
@@ -164,6 +268,8 @@ namespace Ryujinx.HLE.Gpu.Engines
                 long VpAPos = BasePosition + (uint)VpAOffset;
                 long VpBPos = BasePosition + (uint)VpBOffset;
 
+                Keys[(int)GalShaderType.Vertex] = VpBPos;
+
                 Gpu.Renderer.Shader.Create(Vmm, VpAPos, VpBPos, GalShaderType.Vertex);
                 Gpu.Renderer.Shader.Bind(VpBPos);
 
@@ -172,6 +278,8 @@ namespace Ryujinx.HLE.Gpu.Engines
 
             for (; Index < 6; Index++)
             {
+                GalShaderType Type = GetTypeFromProgram(Index);
+
                 int Control = ReadRegister(NvGpuEngine3dReg.ShaderNControl + Index * 0x10);
                 int Offset  = ReadRegister(NvGpuEngine3dReg.ShaderNOffset  + Index * 0x10);
 
@@ -180,23 +288,18 @@ namespace Ryujinx.HLE.Gpu.Engines
 
                 if (!Enable)
                 {
+                    Gpu.Renderer.Shader.Unbind(Type);
+
                     continue;
                 }
 
                 long Key = BasePosition + (uint)Offset;
 
-                GalShaderType ShaderType = GetTypeFromProgram(Index);
+                Keys[(int)Type] = Key;
 
-                Keys[(int)ShaderType] = Key;
-
-                Gpu.Renderer.Shader.Create(Vmm, Key, ShaderType);
+                Gpu.Renderer.Shader.Create(Vmm, Key, Type);
                 Gpu.Renderer.Shader.Bind(Key);
             }
-
-            float SignX = GetFlipSign(NvGpuEngine3dReg.ViewportScaleX);
-            float SignY = GetFlipSign(NvGpuEngine3dReg.ViewportScaleY);
-
-            Gpu.Renderer.Shader.SetFlip(SignX, SignY);
 
             return Keys;
         }
@@ -216,10 +319,16 @@ namespace Ryujinx.HLE.Gpu.Engines
             throw new ArgumentOutOfRangeException(nameof(Program));
         }
 
-        private void SetFrontFace()
+        private void SetFlip(GalPipelineState State)
         {
-            float SignX = GetFlipSign(NvGpuEngine3dReg.ViewportScaleX);
-            float SignY = GetFlipSign(NvGpuEngine3dReg.ViewportScaleY);
+            State.FlipX = GetFlipSign(NvGpuEngine3dReg.ViewportNScaleX);
+            State.FlipY = GetFlipSign(NvGpuEngine3dReg.ViewportNScaleY);
+        }
+
+        private void SetFrontFace(GalPipelineState State)
+        {
+            float SignX = GetFlipSign(NvGpuEngine3dReg.ViewportNScaleX);
+            float SignY = GetFlipSign(NvGpuEngine3dReg.ViewportNScaleY);
 
             GalFrontFace FrontFace = (GalFrontFace)ReadRegister(NvGpuEngine3dReg.FrontFace);
 
@@ -238,228 +347,142 @@ namespace Ryujinx.HLE.Gpu.Engines
                 }
             }
 
-            Gpu.Renderer.Rasterizer.SetFrontFace(FrontFace);
+            State.FrontFace = FrontFace;
         }
 
-        private void SetCullFace()
+        private void SetCullFace(GalPipelineState State)
         {
-            bool Enable = (ReadRegister(NvGpuEngine3dReg.CullFaceEnable) & 1) != 0;
+            State.CullFaceEnabled = (ReadRegister(NvGpuEngine3dReg.CullFaceEnable) & 1) != 0;
 
-            if (Enable)
+            if (State.CullFaceEnabled)
             {
-                Gpu.Renderer.Rasterizer.EnableCullFace();
+                State.CullFace = (GalCullFace)ReadRegister(NvGpuEngine3dReg.CullFace);
             }
-            else
-            {
-                Gpu.Renderer.Rasterizer.DisableCullFace();
-            }
-
-            if (!Enable)
-            {
-                return;
-            }
-
-            GalCullFace CullFace = (GalCullFace)ReadRegister(NvGpuEngine3dReg.CullFace);
-
-            Gpu.Renderer.Rasterizer.SetCullFace(CullFace);
         }
 
-        private void SetDepth()
+        private void SetDepth(GalPipelineState State)
         {
-            float ClearDepth = ReadRegisterFloat(NvGpuEngine3dReg.ClearDepth);
+            State.DepthTestEnabled = (ReadRegister(NvGpuEngine3dReg.DepthTestEnable) & 1) != 0;
 
-            Gpu.Renderer.Rasterizer.SetClearDepth(ClearDepth);
-
-            bool Enable = (ReadRegister(NvGpuEngine3dReg.DepthTestEnable) & 1) != 0;
-
-            if (Enable)
+            if (State.DepthTestEnabled)
             {
-                Gpu.Renderer.Rasterizer.EnableDepthTest();
+                State.DepthFunc = (GalComparisonOp)ReadRegister(NvGpuEngine3dReg.DepthTestFunction);
             }
-            else
-            {
-                Gpu.Renderer.Rasterizer.DisableDepthTest();
-            }
-
-            if (!Enable)
-            {
-                return;
-            }
-
-            GalComparisonOp Func = (GalComparisonOp)ReadRegister(NvGpuEngine3dReg.DepthTestFunction);
-
-            Gpu.Renderer.Rasterizer.SetDepthFunction(Func);
         }
 
-        private void SetStencil()
+        private void SetStencil(GalPipelineState State)
         {
-            int ClearStencil = ReadRegister(NvGpuEngine3dReg.ClearStencil);
+            State.StencilTestEnabled = (ReadRegister(NvGpuEngine3dReg.StencilEnable) & 1) != 0;
 
-            Gpu.Renderer.Rasterizer.SetClearStencil(ClearStencil);
-
-            bool Enable = (ReadRegister(NvGpuEngine3dReg.StencilEnable) & 1) != 0;
-
-            if (Enable)
+            if (State.StencilTestEnabled)
             {
-                Gpu.Renderer.Rasterizer.EnableStencilTest();
+                State.StencilBackFuncFunc = (GalComparisonOp)ReadRegister(NvGpuEngine3dReg.StencilBackFuncFunc);
+                State.StencilBackFuncRef  =                  ReadRegister(NvGpuEngine3dReg.StencilBackFuncRef);
+                State.StencilBackFuncMask =            (uint)ReadRegister(NvGpuEngine3dReg.StencilBackFuncMask);
+                State.StencilBackOpFail   =    (GalStencilOp)ReadRegister(NvGpuEngine3dReg.StencilBackOpFail);
+                State.StencilBackOpZFail  =    (GalStencilOp)ReadRegister(NvGpuEngine3dReg.StencilBackOpZFail);
+                State.StencilBackOpZPass  =    (GalStencilOp)ReadRegister(NvGpuEngine3dReg.StencilBackOpZPass);
+                State.StencilBackMask     =            (uint)ReadRegister(NvGpuEngine3dReg.StencilBackMask);
+
+                State.StencilFrontFuncFunc = (GalComparisonOp)ReadRegister(NvGpuEngine3dReg.StencilFrontFuncFunc);
+                State.StencilFrontFuncRef  =                  ReadRegister(NvGpuEngine3dReg.StencilFrontFuncRef);
+                State.StencilFrontFuncMask =            (uint)ReadRegister(NvGpuEngine3dReg.StencilFrontFuncMask);
+                State.StencilFrontOpFail   =    (GalStencilOp)ReadRegister(NvGpuEngine3dReg.StencilFrontOpFail);
+                State.StencilFrontOpZFail  =    (GalStencilOp)ReadRegister(NvGpuEngine3dReg.StencilFrontOpZFail);
+                State.StencilFrontOpZPass  =    (GalStencilOp)ReadRegister(NvGpuEngine3dReg.StencilFrontOpZPass);
+                State.StencilFrontMask     =            (uint)ReadRegister(NvGpuEngine3dReg.StencilFrontMask);
             }
-            else
-            {
-                Gpu.Renderer.Rasterizer.DisableStencilTest();
-            }
-
-            if (!Enable)
-            {
-                return;
-            }
-
-            void SetFaceStencil(
-                bool IsFrontFace,
-                NvGpuEngine3dReg Func,
-                NvGpuEngine3dReg FuncRef,
-                NvGpuEngine3dReg FuncMask,
-                NvGpuEngine3dReg OpFail,
-                NvGpuEngine3dReg OpZFail,
-                NvGpuEngine3dReg OpZPass,
-                NvGpuEngine3dReg Mask)
-            {
-                Gpu.Renderer.Rasterizer.SetStencilFunction(
-                    IsFrontFace,
-                    (GalComparisonOp)ReadRegister(Func),
-                    ReadRegister(FuncRef),
-                    ReadRegister(FuncMask));
-
-                Gpu.Renderer.Rasterizer.SetStencilOp(
-                    IsFrontFace,
-                    (GalStencilOp)ReadRegister(OpFail),
-                    (GalStencilOp)ReadRegister(OpZFail),
-                    (GalStencilOp)ReadRegister(OpZPass));
-
-                Gpu.Renderer.Rasterizer.SetStencilMask(IsFrontFace, ReadRegister(Mask));
-            }
-
-            SetFaceStencil(false,
-                NvGpuEngine3dReg.StencilBackFuncFunc,
-                NvGpuEngine3dReg.StencilBackFuncRef,
-                NvGpuEngine3dReg.StencilBackFuncMask,
-                NvGpuEngine3dReg.StencilBackOpFail,
-                NvGpuEngine3dReg.StencilBackOpZFail,
-                NvGpuEngine3dReg.StencilBackOpZPass,
-                NvGpuEngine3dReg.StencilBackMask);
-
-            SetFaceStencil(true,
-                NvGpuEngine3dReg.StencilFrontFuncFunc,
-                NvGpuEngine3dReg.StencilFrontFuncRef,
-                NvGpuEngine3dReg.StencilFrontFuncMask,
-                NvGpuEngine3dReg.StencilFrontOpFail,
-                NvGpuEngine3dReg.StencilFrontOpZFail,
-                NvGpuEngine3dReg.StencilFrontOpZPass,
-                NvGpuEngine3dReg.StencilFrontMask);
         }
 
-        private void SetAlphaBlending()
+        private void SetAlphaBlending(GalPipelineState State)
         {
             //TODO: Support independent blend properly.
-            bool Enable = (ReadRegister(NvGpuEngine3dReg.IBlendNEnable) & 1) != 0;
+            State.BlendEnabled = (ReadRegister(NvGpuEngine3dReg.IBlendNEnable) & 1) != 0;
 
-            if (Enable)
+            if (State.BlendEnabled)
             {
-                Gpu.Renderer.Blend.Enable();
-            }
-            else
-            {
-                Gpu.Renderer.Blend.Disable();
-            }
+                State.BlendSeparateAlpha = (ReadRegister(NvGpuEngine3dReg.IBlendNSeparateAlpha) & 1) != 0;
 
-            if (!Enable)
-            {
-                //If blend is not enabled, then the other values have no effect.
-                //Note that if it is disabled, the register may contain invalid values.
-                return;
-            }
-
-            bool BlendSeparateAlpha = (ReadRegister(NvGpuEngine3dReg.IBlendNSeparateAlpha) & 1) != 0;
-
-            GalBlendEquation EquationRgb = (GalBlendEquation)ReadRegister(NvGpuEngine3dReg.IBlendNEquationRgb);
-
-            GalBlendFactor FuncSrcRgb = (GalBlendFactor)ReadRegister(NvGpuEngine3dReg.IBlendNFuncSrcRgb);
-            GalBlendFactor FuncDstRgb = (GalBlendFactor)ReadRegister(NvGpuEngine3dReg.IBlendNFuncDstRgb);
-
-            if (BlendSeparateAlpha)
-            {
-                GalBlendEquation EquationAlpha = (GalBlendEquation)ReadRegister(NvGpuEngine3dReg.IBlendNEquationAlpha);
-
-                GalBlendFactor FuncSrcAlpha = (GalBlendFactor)ReadRegister(NvGpuEngine3dReg.IBlendNFuncSrcAlpha);
-                GalBlendFactor FuncDstAlpha = (GalBlendFactor)ReadRegister(NvGpuEngine3dReg.IBlendNFuncDstAlpha);
-
-                Gpu.Renderer.Blend.SetSeparate(
-                    EquationRgb,
-                    EquationAlpha,
-                    FuncSrcRgb,
-                    FuncDstRgb,
-                    FuncSrcAlpha,
-                    FuncDstAlpha);
-            }
-            else
-            {
-                Gpu.Renderer.Blend.Set(EquationRgb, FuncSrcRgb, FuncDstRgb);
+                State.BlendEquationRgb   = (GalBlendEquation)ReadRegister(NvGpuEngine3dReg.IBlendNEquationRgb);
+                State.BlendFuncSrcRgb    =   (GalBlendFactor)ReadRegister(NvGpuEngine3dReg.IBlendNFuncSrcRgb);
+                State.BlendFuncDstRgb    =   (GalBlendFactor)ReadRegister(NvGpuEngine3dReg.IBlendNFuncDstRgb);
+                State.BlendEquationAlpha = (GalBlendEquation)ReadRegister(NvGpuEngine3dReg.IBlendNEquationAlpha);
+                State.BlendFuncSrcAlpha  =   (GalBlendFactor)ReadRegister(NvGpuEngine3dReg.IBlendNFuncSrcAlpha);
+                State.BlendFuncDstAlpha  =   (GalBlendFactor)ReadRegister(NvGpuEngine3dReg.IBlendNFuncDstAlpha);
             }
         }
 
-        private void SetPrimitiveRestart()
+        private void SetPrimitiveRestart(GalPipelineState State)
         {
-            bool Enable = (ReadRegister(NvGpuEngine3dReg.PrimRestartEnable) & 1) != 0;
+            State.PrimitiveRestartEnabled = (ReadRegister(NvGpuEngine3dReg.PrimRestartEnable) & 1) != 0;
 
-            if (Enable)
+            if (State.PrimitiveRestartEnabled)
             {
-                Gpu.Renderer.Rasterizer.EnablePrimitiveRestart();
+                State.PrimitiveRestartIndex = (uint)ReadRegister(NvGpuEngine3dReg.PrimRestartIndex);
+            }
+        }
+
+        private void SetRenderTargets()
+        {
+            bool SeparateFragData = (ReadRegister(NvGpuEngine3dReg.RTSeparateFragData) & 1) != 0;
+
+            if (SeparateFragData)
+            {
+                uint Control = (uint)(ReadRegister(NvGpuEngine3dReg.RTControl));
+
+                uint Count = Control & 0xf;
+
+                int[] Map = new int[Count];
+
+                for (int i = 0; i < Count; i++)
+                {
+                    int Shift = 4 + i * 3;
+
+                    Map[i] = (int)((Control >> Shift) & 7);
+                }
+
+                Gpu.Renderer.FrameBuffer.SetMap(Map);
             }
             else
             {
-                Gpu.Renderer.Rasterizer.DisablePrimitiveRestart();
+                Gpu.Renderer.FrameBuffer.SetMap(null);
             }
-
-            if (!Enable)
-            {
-                return;
-            }
-
-            uint Index = (uint)ReadRegister(NvGpuEngine3dReg.PrimRestartIndex);
-
-            Gpu.Renderer.Rasterizer.SetPrimitiveRestartIndex(Index);
         }
 
-        private void UploadTextures(NvGpuVmm Vmm, long[] Keys)
+        private void UploadTextures(NvGpuVmm Vmm, GalPipelineState State, long[] Keys)
         {
             long BaseShPosition = MakeInt64From2xInt32(NvGpuEngine3dReg.ShaderAddress);
 
             int TextureCbIndex = ReadRegister(NvGpuEngine3dReg.TextureCbIndex);
 
-            //Note: On the emulator renderer, Texture Unit 0 is
-            //reserved for drawing the frame buffer.
-            int TexIndex = 1;
+            int TexIndex = 0;
 
             for (int Index = 0; Index < Keys.Length; Index++)
             {
                 foreach (ShaderDeclInfo DeclInfo in Gpu.Renderer.Shader.GetTextureUsage(Keys[Index]))
                 {
-                    long Position = ConstBuffers[Index][TextureCbIndex].Position;
+                    long Position;
 
-                    UploadTexture(Vmm, Position, TexIndex, DeclInfo.Index);
+                    if (DeclInfo.IsCb)
+                    {
+                        Position = ConstBuffers[Index][DeclInfo.Cbuf].Position;
+                    }
+                    else
+                    {
+                        Position = ConstBuffers[Index][TextureCbIndex].Position;
+                    }
 
-                    Gpu.Renderer.Shader.EnsureTextureBinding(DeclInfo.Name, TexIndex);
+                    int TextureHandle = Vmm.ReadInt32(Position + DeclInfo.Index * 4);
+
+                    UploadTexture(Vmm, TexIndex, TextureHandle);
 
                     TexIndex++;
                 }
             }
         }
 
-        private void UploadTexture(NvGpuVmm Vmm, long BasePosition, int TexIndex, int HndIndex)
+        private void UploadTexture(NvGpuVmm Vmm, int TexIndex, int TextureHandle)
         {
-            long Position = BasePosition + HndIndex * 4;
-
-            int TextureHandle = Vmm.ReadInt32(Position);
-
             if (TextureHandle == 0)
             {
                 //TODO: Is this correct?
@@ -484,6 +507,12 @@ namespace Ryujinx.HLE.Gpu.Engines
 
             Key = Vmm.GetPhysicalAddress(Key);
 
+            if (Key == -1)
+            {
+                //FIXME: Should'nt ignore invalid addresses.
+                return;
+            }
+
             if (IsFrameBufferPosition(Key))
             {
                 //This texture is a frame buffer texture,
@@ -494,15 +523,15 @@ namespace Ryujinx.HLE.Gpu.Engines
             }
             else
             {
-                GalTexture NewTexture = TextureFactory.MakeTexture(Vmm, TicPosition);
+                GalImage NewImage = TextureFactory.MakeTexture(Vmm, TicPosition);
 
-                long Size = (uint)TextureHelper.GetTextureSize(NewTexture);
+                long Size = (uint)TextureHelper.GetTextureSize(NewImage);
 
                 bool HasCachedTexture = false;
 
-                if (Gpu.Renderer.Texture.TryGetCachedTexture(Key, Size, out GalTexture Texture))
+                if (Gpu.Renderer.Texture.TryGetCachedTexture(Key, Size, out GalImage Image))
                 {
-                    if (NewTexture.Equals(Texture) && !Vmm.IsRegionModified(Key, Size, NvGpuBufferType.Texture))
+                    if (NewImage.Equals(Image) && !QueryKeyUpload(Vmm, Key, Size, NvGpuBufferType.Texture))
                     {
                         Gpu.Renderer.Texture.Bind(Key, TexIndex);
 
@@ -514,7 +543,7 @@ namespace Ryujinx.HLE.Gpu.Engines
                 {
                     byte[] Data = TextureFactory.GetTextureData(Vmm, TicPosition);
 
-                    Gpu.Renderer.Texture.Create(Key, Data, NewTexture);
+                    Gpu.Renderer.Texture.Create(Key, Data, NewImage);
                 }
 
                 Gpu.Renderer.Texture.Bind(Key, TexIndex);
@@ -523,45 +552,40 @@ namespace Ryujinx.HLE.Gpu.Engines
             Gpu.Renderer.Texture.SetSampler(Sampler);
         }
 
-        private void UploadUniforms(NvGpuVmm Vmm)
+        private void UploadConstBuffers(NvGpuVmm Vmm, GalPipelineState State, long[] Keys)
         {
-            long BasePosition = MakeInt64From2xInt32(NvGpuEngine3dReg.ShaderAddress);
-
-            for (int Index = 0; Index < 5; Index++)
+            for (int Stage = 0; Stage < Keys.Length; Stage++)
             {
-                int Control = ReadRegister(NvGpuEngine3dReg.ShaderNControl + (Index + 1) * 0x10);
-                int Offset  = ReadRegister(NvGpuEngine3dReg.ShaderNOffset  + (Index + 1) * 0x10);
-
-                //Note: Vertex Program (B) is always enabled.
-                bool Enable = (Control & 1) != 0 || Index == 0;
-
-                if (!Enable)
+                foreach (ShaderDeclInfo DeclInfo in Gpu.Renderer.Shader.GetConstBufferUsage(Keys[Stage]))
                 {
-                    continue;
-                }
+                    ConstBuffer Cb = ConstBuffers[Stage][DeclInfo.Cbuf];
 
-                for (int Cbuf = 0; Cbuf < ConstBuffers[Index].Length; Cbuf++)
-                {
-                    ConstBuffer Cb = ConstBuffers[Index][Cbuf];
-
-                    if (Cb.Enabled)
+                    if (!Cb.Enabled)
                     {
-                        byte[] Data = Vmm.ReadBytes(Cb.Position, (uint)Cb.Size);
-
-                        Gpu.Renderer.Shader.SetConstBuffer(BasePosition + (uint)Offset, Cbuf, Data);
+                        continue;
                     }
+
+                    long Key = Vmm.GetPhysicalAddress(Cb.Position);
+
+                    if (QueryKeyUpload(Vmm, Key, Cb.Size, NvGpuBufferType.ConstBuffer))
+                    {
+                        IntPtr Source = Vmm.GetHostAddress(Cb.Position, Cb.Size);
+
+                        Gpu.Renderer.Buffer.SetData(Key, Cb.Size, Source);
+                    }
+
+                    State.ConstBufferKeys[Stage][DeclInfo.Cbuf] = Key;
                 }
             }
         }
 
-        private void UploadVertexArrays(NvGpuVmm Vmm)
+        private void UploadVertexArrays(NvGpuVmm Vmm, GalPipelineState State)
         {
             long IndexPosition = MakeInt64From2xInt32(NvGpuEngine3dReg.IndexArrayAddress);
 
             long IboKey = Vmm.GetPhysicalAddress(IndexPosition);
 
             int IndexEntryFmt = ReadRegister(NvGpuEngine3dReg.IndexArrayFormat);
-            int IndexFirst    = ReadRegister(NvGpuEngine3dReg.IndexBatchFirst);
             int IndexCount    = ReadRegister(NvGpuEngine3dReg.IndexBatchCount);
 
             GalIndexFormat IndexFormat = (GalIndexFormat)IndexEntryFmt;
@@ -579,11 +603,11 @@ namespace Ryujinx.HLE.Gpu.Engines
 
                 bool IboCached = Gpu.Renderer.Rasterizer.IsIboCached(IboKey, (uint)IbSize);
 
-                if (!IboCached || Vmm.IsRegionModified(IboKey, (uint)IbSize, NvGpuBufferType.Index))
+                if (!IboCached || QueryKeyUpload(Vmm, IboKey, (uint)IbSize, NvGpuBufferType.Index))
                 {
-                    byte[] Data = Vmm.ReadBytes(IndexPosition, (uint)IbSize);
+                    IntPtr DataAddress = Vmm.GetHostAddress(IndexPosition, IbSize);
 
-                    Gpu.Renderer.Rasterizer.CreateIbo(IboKey, Data);
+                    Gpu.Renderer.Rasterizer.CreateIbo(IboKey, IbSize, DataAddress);
                 }
 
                 Gpu.Renderer.Rasterizer.SetIndexArray(IbSize, IndexFormat);
@@ -611,10 +635,7 @@ namespace Ryujinx.HLE.Gpu.Engines
                                          ((Packed >> 31) & 0x1) != 0));
             }
 
-            int VertexFirst = ReadRegister(NvGpuEngine3dReg.VertexArrayFirst);
-            int VertexCount = ReadRegister(NvGpuEngine3dReg.VertexArrayCount);
-
-            int PrimCtrl = ReadRegister(NvGpuEngine3dReg.VertexBeginGl);
+            State.VertexBindings = new GalVertexBinding[32];
 
             for (int Index = 0; Index < 32; Index++)
             {
@@ -627,44 +648,104 @@ namespace Ryujinx.HLE.Gpu.Engines
 
                 bool Enable = (Control & 0x1000) != 0;
 
-                long VertexPosition = MakeInt64From2xInt32(NvGpuEngine3dReg.VertexArrayNAddress + Index * 4);
-                long VertexEndPos   = MakeInt64From2xInt32(NvGpuEngine3dReg.VertexArrayNEndAddr + Index * 2);
-
                 if (!Enable)
                 {
                     continue;
                 }
 
-                long VboKey = Vmm.GetPhysicalAddress(VertexPosition);
+                long VertexPosition = MakeInt64From2xInt32(NvGpuEngine3dReg.VertexArrayNAddress + Index * 4);
+                long VertexEndPos   = MakeInt64From2xInt32(NvGpuEngine3dReg.VertexArrayNEndAddr + Index * 2);
+
+                int VertexDivisor = ReadRegister(NvGpuEngine3dReg.VertexArrayNDivisor + Index * 4);
+
+                bool Instanced = (ReadRegister(NvGpuEngine3dReg.VertexArrayNInstance + Index) & 1) != 0;
 
                 int Stride = Control & 0xfff;
+
+                if (Instanced && VertexDivisor != 0)
+                {
+                    VertexPosition += Stride * (CurrentInstance / VertexDivisor);
+                }
+
+                if (VertexPosition > VertexEndPos)
+                {
+                    //Instance is invalid, ignore the draw call
+                    continue;
+                }
+
+                long VboKey = Vmm.GetPhysicalAddress(VertexPosition);
 
                 long VbSize = (VertexEndPos - VertexPosition) + 1;
 
                 bool VboCached = Gpu.Renderer.Rasterizer.IsVboCached(VboKey, VbSize);
 
-                if (!VboCached || Vmm.IsRegionModified(VboKey, VbSize, NvGpuBufferType.Vertex))
+                if (!VboCached || QueryKeyUpload(Vmm, VboKey, VbSize, NvGpuBufferType.Vertex))
                 {
-                    byte[] Data = Vmm.ReadBytes(VertexPosition, VbSize);
+                    IntPtr DataAddress = Vmm.GetHostAddress(VertexPosition, VbSize);
 
-                    Gpu.Renderer.Rasterizer.CreateVbo(VboKey, Data);
+                    Gpu.Renderer.Rasterizer.CreateVbo(VboKey, (int)VbSize, DataAddress);
                 }
 
-                Gpu.Renderer.Rasterizer.SetVertexArray(Stride, VboKey, Attribs[Index].ToArray());
+                State.VertexBindings[Index].Enabled   = true;
+                State.VertexBindings[Index].Stride    = Stride;
+                State.VertexBindings[Index].VboKey    = VboKey;
+                State.VertexBindings[Index].Instanced = Instanced;
+                State.VertexBindings[Index].Divisor   = VertexDivisor;
+                State.VertexBindings[Index].Attribs   = Attribs[Index].ToArray();
             }
+        }
+
+        private void DispatchRender(NvGpuVmm Vmm, GalPipelineState State)
+        {
+            int IndexCount = ReadRegister(NvGpuEngine3dReg.IndexBatchCount);
+            int PrimCtrl   = ReadRegister(NvGpuEngine3dReg.VertexBeginGl);
 
             GalPrimitiveType PrimType = (GalPrimitiveType)(PrimCtrl & 0xffff);
 
+            bool InstanceNext = ((PrimCtrl >> 26) & 1) != 0;
+            bool InstanceCont = ((PrimCtrl >> 27) & 1) != 0;
+
+            if (InstanceNext && InstanceCont)
+            {
+                throw new InvalidOperationException("GPU tried to increase and reset instance count at the same time");
+            }
+
+            if (InstanceNext)
+            {
+                CurrentInstance++;
+            }
+            else if (!InstanceCont)
+            {
+                CurrentInstance = 0;
+            }
+
+            State.Instance = CurrentInstance;
+
+            Gpu.Renderer.Pipeline.Bind(State);
+
             if (IndexCount != 0)
             {
-                int VertexBase = ReadRegister(NvGpuEngine3dReg.VertexArrayElemBase);
+                int IndexEntryFmt = ReadRegister(NvGpuEngine3dReg.IndexArrayFormat);
+                int IndexFirst    = ReadRegister(NvGpuEngine3dReg.IndexBatchFirst);
+                int VertexBase    = ReadRegister(NvGpuEngine3dReg.VertexArrayElemBase);
+
+                long IndexPosition = MakeInt64From2xInt32(NvGpuEngine3dReg.IndexArrayAddress);
+
+                long IboKey = Vmm.GetPhysicalAddress(IndexPosition);
 
                 Gpu.Renderer.Rasterizer.DrawElements(IboKey, IndexFirst, VertexBase, PrimType);
             }
             else
             {
+                int VertexFirst = ReadRegister(NvGpuEngine3dReg.VertexArrayFirst);
+                int VertexCount = ReadRegister(NvGpuEngine3dReg.VertexArrayCount);
+
                 Gpu.Renderer.Rasterizer.DrawArrays(VertexFirst, VertexCount, PrimType);
             }
+
+            //Is the GPU really clearing those registers after draw?
+            WriteRegister(NvGpuEngine3dReg.IndexBatchFirst, 0);
+            WriteRegister(NvGpuEngine3dReg.IndexBatchCount, 0);
         }
 
         private void QueryControl(NvGpuVmm Vmm, NvGpuPBEntry PBEntry)
@@ -699,6 +780,8 @@ namespace Ryujinx.HLE.Gpu.Engines
             }
 
             WriteRegister(NvGpuEngine3dReg.ConstBufferOffset, Offset);
+
+            UploadedKeys[(int)NvGpuBufferType.ConstBuffer].Clear();
         }
 
         private void CbBind(NvGpuVmm Vmm, NvGpuPBEntry PBEntry)
@@ -713,10 +796,23 @@ namespace Ryujinx.HLE.Gpu.Engines
 
             long Position = MakeInt64From2xInt32(NvGpuEngine3dReg.ConstBufferAddress);
 
-            ConstBuffers[Stage][Index].Position = Position;
-            ConstBuffers[Stage][Index].Enabled  = Enabled;
+            long CbKey = Vmm.GetPhysicalAddress(Position);
 
-            ConstBuffers[Stage][Index].Size = ReadRegister(NvGpuEngine3dReg.ConstBufferSize);
+            int Size = ReadRegister(NvGpuEngine3dReg.ConstBufferSize);
+
+            if (!Gpu.Renderer.Buffer.IsCached(CbKey, Size))
+            {
+                Gpu.Renderer.Buffer.Create(CbKey, Size);
+            }
+
+            ConstBuffer Cb = ConstBuffers[Stage][Index];
+
+            if (Cb.Position != Position || Cb.Enabled != Enabled || Cb.Size != Size)
+            {
+                ConstBuffers[Stage][Index].Position = Position;
+                ConstBuffers[Stage][Index].Enabled = Enabled;
+                ConstBuffers[Stage][Index].Size = Size;
+            }
         }
 
         private float GetFlipSign(NvGpuEngine3dReg Reg)
@@ -759,6 +855,20 @@ namespace Ryujinx.HLE.Gpu.Engines
         public bool IsFrameBufferPosition(long Position)
         {
             return FrameBuffers.Contains(Position);
+        }
+
+        private bool QueryKeyUpload(NvGpuVmm Vmm, long Key, long Size, NvGpuBufferType Type)
+        {
+            List<long> Uploaded = UploadedKeys[(int)Type];
+
+            if (Uploaded.Contains(Key))
+            {
+                return false;
+            }
+
+            Uploaded.Add(Key);
+
+            return Vmm.IsRegionModified(Key, Size, Type);
         }
     }
 }

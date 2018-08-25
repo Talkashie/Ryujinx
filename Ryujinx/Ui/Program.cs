@@ -18,11 +18,11 @@ namespace Ryujinx
 
             IAalOutput AudioOut = new OpenALAudioOut();
 
-            Switch Ns = new Switch(Renderer, AudioOut);
+            Switch Device = new Switch(Renderer, AudioOut);
 
-            Config.Read(Ns.Log);
+            Config.Read(Device);
 
-            Ns.Log.Updated += ConsoleLog.PrintLog;
+            Device.Log.Updated += ConsoleLog.PrintLog;
 
             if (args.Length == 1)
             {
@@ -39,20 +39,20 @@ namespace Ryujinx
                     {
                         Console.WriteLine("Loading as cart with RomFS.");
 
-                        Ns.LoadCart(args[0], RomFsFiles[0]);
+                        Device.LoadCart(args[0], RomFsFiles[0]);
                     }
                     else
                     {
                         Console.WriteLine("Loading as cart WITHOUT RomFS.");
 
-                        Ns.LoadCart(args[0]);
+                        Device.LoadCart(args[0]);
                     }
                 }
                 else if (File.Exists(args[0]))
                 {
                     Console.WriteLine("Loading as homebrew.");
 
-                    Ns.LoadProgram(args[0]);
+                    Device.LoadProgram(args[0]);
                 }
             }
             else
@@ -60,17 +60,14 @@ namespace Ryujinx
                 Console.WriteLine("Please specify the folder with the NSOs/IStorage or a NSO/NRO.");
             }
 
-            using (GLScreen Screen = new GLScreen(Ns, Renderer))
+            using (GLScreen Screen = new GLScreen(Device, Renderer))
             {
-                Ns.Finish += (Sender, Args) =>
-                {
-                    Screen.Exit();
-                };
-
                 Screen.MainLoop();
+
+                Device.Dispose();
             }
 
-            Environment.Exit(0);
+            AudioOut.Dispose();
         }
     }
 }

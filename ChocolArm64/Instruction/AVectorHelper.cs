@@ -9,6 +9,18 @@ namespace ChocolArm64.Instruction
 {
     static class AVectorHelper
     {
+        private static readonly Vector128<float> Zero32_128Mask;
+
+        static AVectorHelper()
+        {
+            if (!Sse2.IsSupported)
+            {
+                throw new PlatformNotSupportedException();
+            }
+
+            Zero32_128Mask = Sse.StaticCast<uint, float>(Sse2.SetVector128(0, 0, 0, 0xffffffff));
+        }
+
         public static void EmitCall(AILEmitterCtx Context, string Name64, string Name128)
         {
             bool IsSimd64 = Context.CurrOp.RegisterSize == ARegisterSize.SIMD64;
@@ -91,86 +103,6 @@ namespace ChocolArm64.Instruction
 
             return Value > ulong.MaxValue ? ulong.MaxValue :
                    Value < ulong.MinValue ? ulong.MinValue : (ulong)Value;
-        }
-
-        public static double Max(double LHS, double RHS)
-        {
-            if (LHS == 0.0 && RHS == 0.0)
-            {
-                if (BitConverter.DoubleToInt64Bits(LHS) < 0 &&
-                    BitConverter.DoubleToInt64Bits(RHS) < 0)
-                    return -0.0;
-
-                return 0.0;
-            }
-
-            if (LHS > RHS)
-                return LHS;
-
-            if (double.IsNaN(LHS))
-                return LHS;
-
-            return RHS;
-        }
-
-        public static float MaxF(float LHS, float RHS)
-        {
-            if (LHS == 0.0 && RHS == 0.0)
-            {
-                if (BitConverter.SingleToInt32Bits(LHS) < 0 &&
-                    BitConverter.SingleToInt32Bits(RHS) < 0)
-                    return -0.0f;
-
-                return 0.0f;
-            }
-
-            if (LHS > RHS)
-                return LHS;
-
-            if (float.IsNaN(LHS))
-                return LHS;
-
-            return RHS;
-        }
-
-        public static double Min(double LHS, double RHS)
-        {
-            if (LHS == 0.0 && RHS == 0.0)
-            {
-                if (BitConverter.DoubleToInt64Bits(LHS) < 0 ||
-                    BitConverter.DoubleToInt64Bits(RHS) < 0)
-                    return -0.0;
-
-                return 0.0;
-            }
-
-            if (LHS < RHS)
-                return LHS;
-
-            if (double.IsNaN(LHS))
-                return LHS;
-
-            return RHS;
-        }
-
-        public static float MinF(float LHS, float RHS)
-        {
-            if (LHS == 0.0 && RHS == 0.0)
-            {
-                if (BitConverter.SingleToInt32Bits(LHS) < 0 ||
-                    BitConverter.SingleToInt32Bits(RHS) < 0)
-                    return -0.0f;
-
-                return 0.0f;
-            }
-
-            if (LHS < RHS)
-                return LHS;
-
-            if (float.IsNaN(LHS))
-                return LHS;
-
-            return RHS;
         }
 
         public static double Round(double Value, int Fpcr)
@@ -523,6 +455,17 @@ namespace ChocolArm64.Instruction
                 ShortVector = Sse2.Insert(ShortVector, High, (byte)(Index * 2 + 1));
 
                 return Sse.StaticCast<ushort, float>(ShortVector);
+            }
+
+            throw new PlatformNotSupportedException();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Vector128<float> VectorZero32_128(Vector128<float> Vector)
+        {
+            if (Sse.IsSupported)
+            {
+                return Sse.And(Vector, Zero32_128Mask);
             }
 
             throw new PlatformNotSupportedException();
